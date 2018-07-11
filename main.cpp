@@ -106,7 +106,7 @@ struct Grid {
   const int width;
   const int height;
 
-  Grid(F &&func, int w, int h):
+  inline Grid(F &&func, int w, int h):
     func(func),
     width(w), height(h)
   {}
@@ -117,21 +117,21 @@ struct Grid {
     const int y;
     const int width;
 
-    Row(F &&func, int y, int w):
+    inline Row(F &&func, int y, int w):
       func(func), y(y), width(w)
     {}
 
-    decltype(auto) operator[](int x) {
+    inline decltype(auto) operator[](int x) {
       return func(y, x);
     }
   };
 
-  Row operator[](int y) {
+  inline Row operator[](int y) {
     return Row(std::forward<F>(func), y, width);
   }
 };
 
-template <typename CA>
+template <typename AUT>
 struct Board {
   size_t w, h;
 
@@ -147,10 +147,8 @@ struct Board {
     uSampler(uniform_name.c_str()),
     w(0), h(0)
   {
-    color_per_state = (CA::no_states == 0) ? 1 : UINT8_MAX / (CA::no_states - 1);
+    color_per_state = (AUT::no_states == 0) ? 1 : UINT8_MAX / (AUT::no_states - 1);
   }
-
-  GLuint id() const { return tex; }
 
   void init(size_t w_, size_t h_) {
     w=w_,h=h_;
@@ -158,7 +156,7 @@ struct Board {
     buf2 = new uint8_t[w * h];
     /* #pragma omp parallel for */
     for(int i = 0; i < w * h; ++i) {
-      buf1[i] = CA::init_state(i / w, i % w) * color_per_state;
+      buf1[i] = AUT::init_state(i / w, i % w) * color_per_state;
       buf2[i] = 0;
     }
     glGenTextures(1, &tex); GLERROR
@@ -172,9 +170,9 @@ struct Board {
     }
     /* #pragma omp parallel for */
     for(int i = 0; i < w*h; ++i) {
-      dstbuf[i] = CA::next_state(Grid([=](int y, int x) -> uint8_t {
+      dstbuf[i] = AUT::next_state(Grid([=](int y, int x) -> uint8_t {
         if(y < 0 || y > h || x < 0 || x > w) {
-          return CA::outside_state;
+          return AUT::outside_state;
         }
         return srcbuf[y * w + x] / color_per_state;
       }, w, h), i / w, i % w) * color_per_state;
@@ -233,13 +231,14 @@ struct Board {
 };
 
 #include "cellular.hpp"
+#include "linear.hpp"
 
 int main(int argc, char *argv[]) {
   srand(time(NULL));
 
   App app;
 
-  Board<cellular::Conway> board("uBoard"s);
+  Board<linear::Rule90> board("uBoard"s);
   gl::VertexArray vao;
   gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2> attrVertex("vertex"s);
   gl::ShaderProgram<
