@@ -34,7 +34,7 @@ protected:
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //We don't want the old OpenGL
 
-    g_window = window = glfwCreateWindow(width(), height(), "pitch", nullptr, nullptr);
+    g_window = window = glfwCreateWindow(width(), height(), "automata", nullptr, nullptr);
     ASSERT(window != nullptr);
     glfwMakeContextCurrent(window); GLERROR
   }
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
 
   App app;
 
-  Board<linear::Rule90> board("uBoard"s);
+  Board<cellular::DayAndNight> board("uBoard"s);
   gl::VertexArray vao;
   gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2> attrVertex("vertex"s);
   gl::ShaderProgram<
