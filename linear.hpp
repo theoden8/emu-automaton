@@ -59,8 +59,9 @@ template <int N, uint64_t C> struct Rule {
 } // namespace la
 
 namespace linear {
-  using Rule110 = la::Rule<3, 110LLU>;
   using Rule30 = la::Rule<3, 30LLU>;
+  using Rule54 = la::Rule<3, 54LLU>;
   using Rule90 = la::Rule<3, 90LLU>;
+  using Rule110 = la::Rule<3, 110LLU>;
   using Rule184 = la::Rule<3, 184LLU>;
 } // namespace linear

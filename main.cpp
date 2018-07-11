@@ -268,7 +268,7 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = 4;
+      const int factor = 1;
       board.init(w.width()/factor, w.height()/factor);
       board.uSampler.set_id(prog.id());
     },
