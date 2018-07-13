@@ -26,7 +26,7 @@ protected:
     ASSERT(vidmode != nullptr);
     width_ = vidmode->width;
     height_ = vidmode->height;
-    width_ = height_ = std::min(width_, height_);
+    /* width_ = height_ = std::min(width_, height_); */
 
     /* glfwWindowHint(GLFW_SAMPLES, 4); */
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -230,8 +230,8 @@ struct Board {
   }
 };
 
-#include "cellular.hpp"
-#include "linear.hpp"
+#include "Cellular.hpp"
+#include "Linear.hpp"
 
 int main(int argc, char *argv[]) {
   srand(time(NULL));
@@ -268,7 +268,7 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = 1;
+      const int factor = 4;
       board.init(w.width()/factor, w.height()/factor);
       board.uSampler.set_id(prog.id());
     },
