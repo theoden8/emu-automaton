@@ -59,8 +59,8 @@ public:
     width_(0),
     height_(0)
   {}
-  size_t width() const { return width_; }
-  size_t height() const { return height_; }
+  inline size_t width() const { return width_; }
+  inline size_t height() const { return height_; }
   template <typename SF, typename DF, typename CF>
   void run(SF &&setupfunc, DF &&dispfunc, CF &&cleanupfunc) {
     init_glfw();
@@ -134,6 +134,7 @@ struct Grid {
 template <typename AUT>
 struct Board {
   size_t w, h;
+  size_t tw, th;
 
   int color_per_state;
 
@@ -141,7 +142,8 @@ struct Board {
   gl::Uniform<gl::UniformType::SAMPLER2D> uSampler;
 
   int8_t current_buf = 0;
-  uint8_t *buf1, *buf2;
+  bool extrabuf = false;
+  uint8_t *finalbuf=nullptr, *buf1=nullptr, *buf2=nullptr;
 
   Board(std::string uniform_name):
     uSampler(uniform_name.c_str()),
@@ -150,17 +152,30 @@ struct Board {
     color_per_state = (AUT::no_states == 0) ? 1 : UINT8_MAX / (AUT::no_states - 1);
   }
 
-  void init(size_t w_, size_t h_) {
+  void init(int w_, int h_, int zoom) {
+    if(zoom==0)zoom=1;
+    if(zoom >= 0) {
+      w_ /= zoom, h_ /= zoom;
+      tw = w_, th = h_;
+    } else if(zoom < 0) {
+      tw = w_, th = h_;
+      w_ *= -zoom, h_ *= -zoom;
+    }
     w=w_,h=h_;
+    printf("[%d %d] [%d %d]\n", w,h,tw,th);
+    if(w!=tw||h!=th||extrabuf) {
+      extrabuf = true;
+      finalbuf = new uint8_t[tw * th];
+    }
     buf1 = new uint8_t[w * h];
     buf2 = new uint8_t[w * h];
-    /* #pragma omp parallel for */
+    #pragma omp parallel for
     for(int i = 0; i < w * h; ++i) {
       buf1[i] = AUT::init_state(i / w, i % w) * color_per_state;
       buf2[i] = 0;
     }
     glGenTextures(1, &tex); GLERROR
-    update_image();
+    reinit_texture();
   }
 
   void update() {
@@ -180,10 +195,28 @@ struct Board {
     current_buf = current_buf ? 0 : 1;
   }
 
-  void update_image() {
+  void reinit_texture() {
     uint8_t *srcbuf = !current_buf ? buf1 : buf2;
+    if(extrabuf) {
+      int per_x = w / tw;
+      int per_y = h / th;
+      #pragma omp parallel for
+      for(int i = 0; i < tw*th; ++i) {
+        uint32_t sum = 0;
+        int y = i / tw, x = i % tw;
+        int q = 0;
+        for(int iy = 0; iy < per_y; ++iy) {
+          for(int ix = 0; ix < per_x; ++ix) {
+            sum += srcbuf[(i / tw * per_y + iy) * w + (i % tw) * per_x + ix];
+            ++q;
+          }
+        }
+        finalbuf[i] = uint8_t(sum / q);
+      }
+      srcbuf = finalbuf;
+    }
     Board::bind();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, srcbuf); GLERROR
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, srcbuf); GLERROR
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); GLERROR
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); GLERROR
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); GLERROR
@@ -226,6 +259,11 @@ struct Board {
     glDeleteTextures(1, &tex); GLERROR
     delete [] buf1;
     delete [] buf2;
+    if(extrabuf) {
+      delete [] finalbuf;
+      extrabuf = false;
+      finalbuf = nullptr;
+    }
     buf1 = buf2 = nullptr;
   }
 };
@@ -268,17 +306,17 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = 4;
-      board.init(w.width()/factor, w.height()/factor);
+      const int factor = -4;
+      board.init(w.width(), w.height(), factor);
       board.uSampler.set_id(prog.id());
     },
     // display function
     [&](auto &w) mutable {
-      /* Logger::Info("draw\n"); */
+      Logger::Info("draw\n");
       // use program
       ShaderProgram::use(prog);
       board.update();
-      board.update_image();
+      board.reinit_texture();
       board.set_active(0);
       board.bind();
       board.set_data(0);

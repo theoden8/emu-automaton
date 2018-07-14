@@ -15,7 +15,7 @@ else()
     message(WARNING "You are using unsupported compiler, and will probably have to change the source code.")
 endif()
 
-set(CMAKE_CXX_FLAGS "-std=c++1z")
+set(CMAKE_CXX_FLAGS "-std=c++1z -fopenmp")
 
 set(exec automaton)
 add_executable(${exec} ./main.cpp)
@@ -25,12 +25,10 @@ find_package(PkgConfig)
 
 find_package(Threads REQUIRED)
 if(THREADS_HAVE_PTHREAD_ARG)
-  target_compile_options(metaserver PUBLIC "-pthread")
-  target_compile_options(minififa PUBLIC "-pthread")
+  target_compile_options(${exec} PUBLIC "-pthread")
 endif()
 if(CMAKE_THREAD_LIBS_INIT)
-  target_link_libraries(metaserver "${CMAKE_THREAD_LIBS_INIT}")
-  target_link_libraries(minififa "${CMAKE_THREAD_LIBS_INIT}")
+  target_link_libraries(${exec} "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
 find_package(OpenGL REQUIRED)
