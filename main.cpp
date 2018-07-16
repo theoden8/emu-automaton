@@ -29,14 +29,15 @@ protected:
     /* width_ = height_ = std::min(width_, height_); */
 
     /* glfwWindowHint(GLFW_SAMPLES, 4); */
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //We don't want the old OpenGL
 
     g_window = window = glfwCreateWindow(width(), height(), "automata", nullptr, nullptr);
     ASSERT(window != nullptr);
     glfwMakeContextCurrent(window); GLERROR
+    Logger::Info("initialized glfw\n");
   }
   void init_glew() {
     // Initialize GLEW
@@ -47,11 +48,13 @@ protected:
       Logger::Error("glew error: %s\n", "there was some error initializing glew");
       /* Logger::Error("glew error: %s\n", glewGetErrorString()); */
     }
+    Logger::Info("initialized glew\n");
   }
   void init_controls() {
     // ensure we can capture the escape key
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE); GLERROR
     /* glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); GLERROR */
+    Logger::Info("initialized controls\n");
   }
 public:
   GLFWwindow *window = nullptr;
@@ -133,8 +136,8 @@ struct Grid {
 
 template <typename AUT>
 struct Board {
-  size_t w, h;
-  size_t tw, th;
+  int w, h;
+  int tw, th;
 
   int color_per_state;
 
@@ -152,7 +155,7 @@ struct Board {
     color_per_state = (AUT::no_states == 0) ? 1 : UINT8_MAX / (AUT::no_states - 1);
   }
 
-  void init(int w_, int h_, int zoom) {
+  void init(int w_, int h_, int zoom=0) {
     if(zoom==0)zoom=1;
     if(zoom >= 0) {
       w_ /= zoom, h_ /= zoom;
@@ -187,12 +190,15 @@ struct Board {
     for(int i = 0; i < w*h; ++i) {
       dstbuf[i] = AUT::next_state(Grid([=](int y, int x) -> uint8_t {
         if(y < 0 || y > h || x < 0 || x > w) {
-          return AUT::outside_state;
+          y = (y < 0) ? y + h : y % h;
+          x = (x < 0) ? x + w : x % w;
+          // return AUT::outside_state;
         }
         return srcbuf[y * w + x] / color_per_state;
       }, w, h), i / w, i % w) * color_per_state;
     }
     current_buf = current_buf ? 0 : 1;
+    reinit_texture();
   }
 
   void reinit_texture() {
@@ -221,7 +227,7 @@ struct Board {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); GLERROR
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); GLERROR
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); GLERROR
-    glGenerateMipmap(GL_TEXTURE_2D); GLERROR
+    /* glGenerateMipmap(GL_TEXTURE_2D); GLERROR */
     Board::unbind();
   }
 
@@ -271,6 +277,86 @@ struct Board {
 #include "Cellular.hpp"
 #include "Linear.hpp"
 
+template <>
+struct Board<cellular::Conway> {
+  using AUT = cellular::Conway;
+  int w, h;
+  gl::ShaderProgram<gl::ComputeShader> compute;
+  gl::Uniform<gl::UniformType::SAMPLER2D> uSampler;
+  int current_tex = 0;
+  GLuint tex1 = 0, tex2 = 0;
+
+  using ShaderProgram = decltype(compute);
+
+  Board(std::string s):
+    w(0), h(0),
+    uSampler(s),
+    compute({"shaders/conway.comp"})
+  {}
+
+  void init(int w_, int h_, int zoom=0) {
+    w=w_,h=h_;
+    float *buf = new float[w*h];
+    for(int i = 0; i < w*h; ++i)buf[i]=AUT::init_state(i / w, i % w);
+    ShaderProgram::compile_program(compute);
+    ASSERT(compute.is_valid());
+    int tw=w,th=h;
+    for(GLuint *tex : {&tex1, &tex2}) {
+      glGenTextures(1, tex); GLERROR
+      glBindTexture(GL_TEXTURE_2D, *tex); GLERROR
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_FLOAT, buf); GLERROR
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); GLERROR
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); GLERROR
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); GLERROR
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); GLERROR
+      glBindTexture(GL_TEXTURE_2D, 0); GLERROR
+    }
+    delete [] buf;
+  }
+
+  void update() {
+    int wg_size[3];
+    GLuint srctex = current_tex?tex1:tex2;
+    GLuint dsttex = current_tex?tex2:tex1;
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size[0]); GLERROR
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size[1]); GLERROR
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size[2]); GLERROR
+    Logger::Info("max work group sizes: [%d %d %d]\n", wg_size[0], wg_size[1], wg_size[2]);
+    int wg_invocations;
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR
+    glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8); GLERROR
+    glBindImageTexture(0, dsttex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8); GLERROR
+    Logger::Info("max work group invocations: %d\n", wg_invocations);
+    ShaderProgram::use(compute);
+    compute.dispatch((GLuint)w, (GLuint)h, 1);
+    ShaderProgram::unuse();
+    current_tex=current_tex?0:1;
+  }
+
+  void set_active(int index) {
+    glActiveTexture(GL_TEXTURE0 + index + current_tex); GLERROR
+  }
+
+  void set_data(int index) {
+    uSampler.set_data(index + current_tex);
+  }
+
+  void bind() {
+    GLuint tex = current_tex?tex1:tex2;
+    glBindTexture(GL_TEXTURE_2D, tex); GLERROR
+  }
+
+  void unbind() {
+    glBindTexture(GL_TEXTURE_2D, current_tex); GLERROR
+  }
+
+  void clear() {
+    glDeleteTextures(1, &tex1); GLERROR
+    glDeleteTextures(1, &tex2); GLERROR
+    ShaderProgram::clear(compute);
+  }
+};
+
 int main(int argc, char *argv[]) {
   srand(time(NULL));
 
@@ -306,17 +392,16 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = -4;
+      const int factor = 4;
       board.init(w.width(), w.height(), factor);
       board.uSampler.set_id(prog.id());
+      Logger::Info("init fin\n");
     },
     // display function
     [&](auto &w) mutable {
-      Logger::Info("draw\n");
       // use program
-      ShaderProgram::use(prog);
       board.update();
-      board.reinit_texture();
+      ShaderProgram::use(prog);
       board.set_active(0);
       board.bind();
       board.set_data(0);

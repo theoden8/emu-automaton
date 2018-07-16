@@ -191,7 +191,7 @@ public:
 
   bool is_valid() {
     glValidateProgram(programId); GLERROR
-    int params = get<GL_VALIDATE_STATUS>();;
+    int params = get<GL_VALIDATE_STATUS>();
     Logger::Info("programId %d GL_VALIDATE_STATUS = %d\n", programId, params);
     print_info_log();
     print_all();

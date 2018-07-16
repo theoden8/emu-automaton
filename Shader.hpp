@@ -41,12 +41,12 @@ struct Shader {
   Shader(std::string filename):
     file(filename.c_str())
   {
-    if(file.is_ext(".vert")) { ASSERT(ShaderT == ShaderType::VERTEX); } else
-    if(file.is_ext(".tesc")) { ASSERT(ShaderT == ShaderType::TESS_CNTRL); } else
-    if(file.is_ext(".tese")) { ASSERT(ShaderT == ShaderType::TESS_EVAL); } else
-    if(file.is_ext(".geom")) { ASSERT(ShaderT == ShaderType::GEOMETRY); } else
-    if(file.is_ext(".frag")) { ASSERT(ShaderT == ShaderType::FRAGMENT); } else
-    if(file.is_ext(".comp")) { ASSERT(ShaderT == ShaderType::COMPUTE); } else {
+    if(file.is_ext(".vert")) { ASSERT(ShaderT == gl::ShaderType::VERTEX); } else
+    if(file.is_ext(".tesc")) { ASSERT(ShaderT == gl::ShaderType::TESS_CNTRL); } else
+    if(file.is_ext(".tese")) { ASSERT(ShaderT == gl::ShaderType::TESS_EVAL); } else
+    if(file.is_ext(".geom")) { ASSERT(ShaderT == gl::ShaderType::GEOMETRY); } else
+    if(file.is_ext(".frag")) { ASSERT(ShaderT == gl::ShaderType::FRAGMENT); } else
+    if(file.is_ext(".comp")) { ASSERT(ShaderT == gl::ShaderType::COMPUTE); } else {
       throw std::runtime_error("unknown shader type");
     }
   }
@@ -56,7 +56,7 @@ struct Shader {
     return shaderId;
   }
   void init() {
-    shaderId = glCreateShader(get_gl_shader_constant<ShaderT>()); GLERROR
+    shaderId = glCreateShader(gl::get_gl_shader_constant<ShaderT>()); GLERROR
     std::string source_code = file.load_text();
     const char *source = source_code.c_str();
     glShaderSource(shaderId, 1, &source, nullptr); GLERROR
