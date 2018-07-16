@@ -1,18 +1,25 @@
 #include <string>
 #include <cstdint>
 
-#include "incgraphics.h"
+#include <incgraphics.h>
 
-#include "Logger.hpp"
-#include "Debug.hpp"
+#include <Logger.hpp>
+#include <Debug.hpp>
 
-#include "ShaderProgram.hpp"
-#include "ShaderAttrib.hpp"
-#include "ShaderUniform.hpp"
+#include <ShaderProgram.hpp>
+#include <ShaderAttrib.hpp>
+#include <ShaderUniform.hpp>
 
 using namespace std::literals::string_literals;
 
 GLFWwindow *g_window = nullptr;
+
+GLvoid debug_callback(GLenum source, GLenum type, GLuint id,
+                              GLuint severity, GLsizei length,
+                              const GLchar *message, const GLvoid *userParam)
+{
+  Logger::Info("%s\n", message);
+}
 
 class Window {
 protected:
@@ -69,6 +76,7 @@ public:
     init_glfw();
     init_glew();
     init_controls();
+    glDebugMessageCallbackARB(&debug_callback, nullptr); GLERROR
     setupfunc(*this);
     glfwSwapInterval(1); GLERROR
     while(!glfwWindowShouldClose(window)) {
@@ -186,7 +194,7 @@ struct Board {
     if(current_buf) {
       std::swap(srcbuf, dstbuf);
     }
-    /* #pragma omp parallel for */
+    #pragma omp parallel for
     for(int i = 0; i < w*h; ++i) {
       dstbuf[i] = AUT::next_state(Grid([=](int y, int x) -> uint8_t {
         if(y < 0 || y > h || x < 0 || x > w) {
@@ -281,9 +289,10 @@ template <>
 struct Board<cellular::Conway> {
   using AUT = cellular::Conway;
   int w, h;
+  int tw,th;
   gl::ShaderProgram<gl::ComputeShader> compute;
   gl::Uniform<gl::UniformType::SAMPLER2D> uSampler;
-  int current_tex = 0;
+  int8_t current_tex = 0;
   GLuint tex1 = 0, tex2 = 0;
 
   using ShaderProgram = decltype(compute);
@@ -296,8 +305,6 @@ struct Board<cellular::Conway> {
 
   void init(int w_, int h_, int zoom=0) {
     w=w_,h=h_;
-    uint8_t *buf = new uint8_t[w*h];
-    for(int i = 0; i < w*h; ++i)buf[i]=AUT::init_state(i / w, i % w) * 255u;
     ShaderProgram::compile_program(compute);
     ASSERT(compute.is_valid());
     if(!zoom)zoom=1;
@@ -306,7 +313,9 @@ struct Board<cellular::Conway> {
     } else {
       w_*=-zoom,h_*=-zoom;
     }
-    int tw=w_,th=h_;
+    tw=w_,th=h_;
+    uint8_t *buf = new uint8_t[w*h];
+    for(int i=0;i<w*h;++i)buf[i]=AUT::init_state(i/w,i%w)?~uint8_t(0):0;
     for(GLuint *tex : {&tex1, &tex2}) {
       glGenTextures(1, tex); GLERROR
       glBindTexture(GL_TEXTURE_2D, *tex); GLERROR
@@ -329,18 +338,22 @@ struct Board<cellular::Conway> {
     /* int wg_invocations; */
     /* glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR */
     /* Logger::Info("max work group invocations: %d\n", wg_invocations); */
-    Logger::Info("current tex: %d\n", current_tex);
+    /* Logger::Info("current tex: %d\n", current_tex); */
     GLuint srctex = current_tex?tex1:tex2,
            dsttex = current_tex?tex2:tex1;
-    glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8UI); GLERROR
-    glBindImageTexture(0, dsttex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI); GLERROR
     ShaderProgram::use(compute);
-    int lsX = 1, lsY = 1;
-    compute.dispatch(GLuint(w)/lsX, GLuint(h)/lsY, 1);
+    glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8); GLERROR
+    glBindImageTexture(1, dsttex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8); GLERROR
+    glUniform1i(glGetUniformLocation(compute.id(), "srcTex"), 0);
+    glUniform1i(glGetUniformLocation(compute.id(), "dstTex"), 1);
+    int lsX=1,lsY=1;
+    compute.dispatch(GLuint(tw)/lsX, GLuint(th)/lsY, 1);
     ShaderProgram::unuse();
     current_tex=current_tex?0:1;
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT
-                    | GL_TEXTURE_UPDATE_BARRIER_BIT); GLERROR
+    /* glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT */
+    /*                 | GL_TEXTURE_UPDATE_BARRIER_BIT); GLERROR */
+    glMemoryBarrier(GL_ALL_BARRIER_BITS); GLERROR
+    glFinish(); GLERROR
   }
 
   void set_active(int index) {
@@ -389,7 +402,7 @@ int main(int argc, char *argv[]) {
       Logger::Info("init\n");
       // init attribute vertex
       ShaderAttrib::init(attrVertex);
-      attrVertex.allocate<GL_STREAM_DRAW>(6, (float[]){
+      attrVertex.allocate<GL_STATIC_DRAW>(6, (float[]){
         1,1, -1,1, -1,-1,
         -1,-1, 1,1, 1,-1,
       });
@@ -402,7 +415,7 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = 8;
+      const int factor = 16;
       board.init(w.width(), w.height(), factor);
       board.uSampler.set_id(prog.id());
       Logger::Info("init fin\n");
@@ -410,6 +423,7 @@ int main(int argc, char *argv[]) {
     // display function
     [&](auto &w) mutable {
       // use program
+      /* Logger::Info("draw\n"); */
       board.update();
       ShaderProgram::use(prog);
       board.set_active(0);
