@@ -1,9 +1,12 @@
-#version 420 core
+#version 430 core
 #extension GL_ARB_compute_shader: enable
 
 layout(local_size_x = 1, local_size_y = 1) in;
-layout (r8, binding = 0) uniform image2D srcTex;
-layout (r8, binding = 1) uniform image2D dstTex;
+layout (r8ui, binding = 0) uniform readonly uimage2D srcTex;
+layout (r8ui, binding = 1) uniform writeonly uimage2D dstTex;
 
 void main(void) {
+  ivec2 ind = ivec2(gl_GlobalInvocationID.xy);
+  /* uint texel = imageLoad(srcTex, ind).r; */
+  imageStore(dstTex, ind, uvec4(0, 0, 0, 0));
 }

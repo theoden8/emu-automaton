@@ -30,7 +30,7 @@ protected:
 
     /* glfwWindowHint(GLFW_SAMPLES, 4); */
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //We don't want the old OpenGL
 
@@ -296,49 +296,59 @@ struct Board<cellular::Conway> {
 
   void init(int w_, int h_, int zoom=0) {
     w=w_,h=h_;
-    float *buf = new float[w*h];
-    for(int i = 0; i < w*h; ++i)buf[i]=AUT::init_state(i / w, i % w);
+    uint8_t *buf = new uint8_t[w*h];
+    for(int i = 0; i < w*h; ++i)buf[i]=AUT::init_state(i / w, i % w) * 255u;
     ShaderProgram::compile_program(compute);
     ASSERT(compute.is_valid());
-    int tw=w,th=h;
+    if(!zoom)zoom=1;
+    if(zoom > 0) {
+      w_/=zoom,h_/=zoom;
+    } else {
+      w_*=-zoom,h_*=-zoom;
+    }
+    int tw=w_,th=h_;
     for(GLuint *tex : {&tex1, &tex2}) {
       glGenTextures(1, tex); GLERROR
       glBindTexture(GL_TEXTURE_2D, *tex); GLERROR
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_FLOAT, buf); GLERROR
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, buf); GLERROR
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); GLERROR
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); GLERROR
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); GLERROR
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); GLERROR
-      glBindTexture(GL_TEXTURE_2D, 0); GLERROR
+      unbind();
     }
     delete [] buf;
   }
 
   void update() {
-    int wg_size[3];
-    GLuint srctex = current_tex?tex1:tex2;
-    GLuint dsttex = current_tex?tex2:tex1;
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size[0]); GLERROR
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size[1]); GLERROR
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size[2]); GLERROR
-    Logger::Info("max work group sizes: [%d %d %d]\n", wg_size[0], wg_size[1], wg_size[2]);
-    int wg_invocations;
-    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR
-    glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8); GLERROR
-    glBindImageTexture(0, dsttex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8); GLERROR
-    Logger::Info("max work group invocations: %d\n", wg_invocations);
+    /* int wg_size[3]; */
+    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size[0]); GLERROR */
+    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size[1]); GLERROR */
+    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size[2]); GLERROR */
+    /* Logger::Info("max work group sizes: [%d %d %d]\n", wg_size[0], wg_size[1], wg_size[2]); */
+    /* int wg_invocations; */
+    /* glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR */
+    /* Logger::Info("max work group invocations: %d\n", wg_invocations); */
+    Logger::Info("current tex: %d\n", current_tex);
+    GLuint srctex = current_tex?tex1:tex2,
+           dsttex = current_tex?tex2:tex1;
+    glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8UI); GLERROR
+    glBindImageTexture(0, dsttex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI); GLERROR
     ShaderProgram::use(compute);
-    compute.dispatch((GLuint)w, (GLuint)h, 1);
+    int lsX = 1, lsY = 1;
+    compute.dispatch(GLuint(w)/lsX, GLuint(h)/lsY, 1);
     ShaderProgram::unuse();
     current_tex=current_tex?0:1;
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT
+                    | GL_TEXTURE_UPDATE_BARRIER_BIT); GLERROR
   }
 
   void set_active(int index) {
-    glActiveTexture(GL_TEXTURE0 + index + current_tex); GLERROR
+    glActiveTexture(GL_TEXTURE0 + index); GLERROR
   }
 
   void set_data(int index) {
-    uSampler.set_data(index + current_tex);
+    uSampler.set_data(index);
   }
 
   void bind() {
@@ -347,7 +357,7 @@ struct Board<cellular::Conway> {
   }
 
   void unbind() {
-    glBindTexture(GL_TEXTURE_2D, current_tex); GLERROR
+    glBindTexture(GL_TEXTURE_2D, 0); GLERROR
   }
 
   void clear() {
@@ -362,7 +372,7 @@ int main(int argc, char *argv[]) {
 
   App app;
 
-  Board<cellular::DayAndNight> board("uBoard"s);
+  Board<cellular::Conway> board("uBoard"s);
   gl::VertexArray vao;
   gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2> attrVertex("vertex"s);
   gl::ShaderProgram<
@@ -392,7 +402,7 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = 4;
+      const int factor = 8;
       board.init(w.width(), w.height(), factor);
       board.uSampler.set_id(prog.id());
       Logger::Info("init fin\n");
