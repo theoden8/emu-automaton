@@ -44,6 +44,7 @@ struct BS<sequence<Bs...>, sequence<Ss...>> {
   using this_t = BS<sequence<Bs...>, sequence<Ss...>>;
   static constexpr int outside_state = 0;
   static constexpr int no_states = 2;
+  static constexpr int dim = 4;
   static inline uint8_t init_state(int y, int x) {
     return random<this_t>(y, x);
   }

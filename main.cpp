@@ -9,6 +9,7 @@
 #include <ShaderProgram.hpp>
 #include <ShaderAttrib.hpp>
 #include <ShaderUniform.hpp>
+#include <Texture.hpp>
 
 using namespace std::literals::string_literals;
 
@@ -37,7 +38,7 @@ protected:
 
     /* glfwWindowHint(GLFW_SAMPLES, 4); */
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //We don't want the old OpenGL
 
@@ -76,7 +77,7 @@ public:
     init_glfw();
     init_glew();
     init_controls();
-    glDebugMessageCallbackARB(&debug_callback, nullptr); GLERROR
+    /* glDebugMessageCallbackARB(&debug_callback, nullptr); GLERROR */
     setupfunc(*this);
     glfwSwapInterval(1); GLERROR
     while(!glfwWindowShouldClose(window)) {
@@ -110,40 +111,15 @@ public:
   }
 };
 
-template <typename F>
-struct Grid {
-  F func;
+#include <Automaton.hpp>
 
-  const int width;
-  const int height;
+template <typename AUT, typename StorageMode, typename AccessMode> struct Renderer;
 
-  inline Grid(F &&func, int w, int h):
-    func(func),
-    width(w), height(h)
-  {}
+template <typename AUT, typename AccessMode>
+struct Renderer <AUT, storage_mode::HostBuffer, AccessMode> {
+  using StorageT = Storage<AUT::dim, storage_mode::HostBuffer>;
+  using AccessT = Access<AUT, StorageT, AccessMode>;
 
-  struct Row {
-    F func;
-
-    const int y;
-    const int width;
-
-    inline Row(F &&func, int y, int w):
-      func(func), y(y), width(w)
-    {}
-
-    inline decltype(auto) operator[](int x) {
-      return func(y, x);
-    }
-  };
-
-  inline Row operator[](int y) {
-    return Row(std::forward<F>(func), y, width);
-  }
-};
-
-template <typename AUT>
-struct Board {
   int w, h;
   int tw, th;
 
@@ -154,9 +130,9 @@ struct Board {
 
   int8_t current_buf = 0;
   bool extrabuf = false;
-  uint8_t *finalbuf=nullptr, *buf1=nullptr, *buf2=nullptr;
+  StorageT finalbuf, buf1, buf2;
 
-  Board(std::string uniform_name):
+  Renderer(std::string uniform_name):
     uSampler(uniform_name.c_str()),
     w(0), h(0)
   {
@@ -176,33 +152,28 @@ struct Board {
     printf("[%d %d] [%d %d]\n", w,h,tw,th);
     if(w!=tw||h!=th||extrabuf) {
       extrabuf = true;
-      finalbuf = new uint8_t[tw * th];
+      finalbuf.init(tw, th);
     }
-    buf1 = new uint8_t[w * h];
-    buf2 = new uint8_t[w * h];
+    buf1.init(w, h);
+    buf2.init(w, h);
     #pragma omp parallel for
     for(int i = 0; i < w * h; ++i) {
-      buf1[i] = AUT::init_state(i / w, i % w) * color_per_state;
-      buf2[i] = 0;
+      buf1.data[i] = AUT::init_state(i / buf1.w, i % buf1.w) * color_per_state;
+      buf2.data[i] = 0;
     }
-    glGenTextures(1, &tex); GLERROR
+    gl::Texture<GL_TEXTURE_2D>::init(tex);
     reinit_texture();
   }
 
   void update() {
-    uint8_t *srcbuf = buf1, *dstbuf = buf2;
+    StorageT srcbuf = buf1, dstbuf = buf2;
     if(current_buf) {
       std::swap(srcbuf, dstbuf);
     }
     #pragma omp parallel for
     for(int i = 0; i < w*h; ++i) {
-      dstbuf[i] = AUT::next_state(Grid([=](int y, int x) -> uint8_t {
-        if(y < 0 || y > h || x < 0 || x > w) {
-          y = (y < 0) ? y + h : y % h;
-          x = (x < 0) ? x + w : x % w;
-          // return AUT::outside_state;
-        }
-        return srcbuf[y * w + x] / color_per_state;
+      dstbuf.data[i] = AUT::next_state(make_grid<4>([=](int y, int x) -> typename StorageT::value_type {
+        return AccessT::access(srcbuf, y, x) / color_per_state;
       }, w, h), i / w, i % w) * color_per_state;
     }
     current_buf = current_buf ? 0 : 1;
@@ -210,7 +181,7 @@ struct Board {
   }
 
   void reinit_texture() {
-    uint8_t *srcbuf = !current_buf ? buf1 : buf2;
+    StorageT srcbuf = !current_buf ? buf1 : buf2;
     if(extrabuf) {
       int per_x = w / tw;
       int per_y = h / th;
@@ -221,22 +192,22 @@ struct Board {
         int q = 0;
         for(int iy = 0; iy < per_y; ++iy) {
           for(int ix = 0; ix < per_x; ++ix) {
-            sum += srcbuf[(i / tw * per_y + iy) * w + (i % tw) * per_x + ix];
+            sum += srcbuf.data[(i / tw * per_y + iy) * w + (i % tw) * per_x + ix];
             ++q;
           }
         }
-        finalbuf[i] = uint8_t(sum / q);
+        finalbuf.data[i] = uint8_t(sum / q);
       }
       srcbuf = finalbuf;
     }
-    Board::bind();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, srcbuf); GLERROR
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); GLERROR
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); GLERROR
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); GLERROR
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); GLERROR
+    gl::Texture<GL_TEXTURE_2D>::bind(tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, srcbuf.data); GLERROR
+    gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     /* glGenerateMipmap(GL_TEXTURE_2D); GLERROR */
-    Board::unbind();
+    gl::Texture<GL_TEXTURE_2D>::unbind();
   }
 
   static void set_active(int index=0) {
@@ -249,44 +220,31 @@ struct Board {
     return active_tex;
   }
 
-  static void bind(GLuint texId) {
-    glBindTexture(GL_TEXTURE_2D, texId); GLERROR
-  }
-
-  static void bind(Board &board) {
-    board.bind();
-  }
-
-  void bind() {
-    bind(tex);
+  void bind_texture() {
+    gl::Texture<GL_TEXTURE_2D>::bind(tex);
   }
 
   void set_data(int index) {
     uSampler.set_data(index);
   }
 
-  static void unbind() {
-    glBindTexture(GL_TEXTURE_2D, 0); GLERROR
+  static void unbind_texture() {
+    gl::Texture<GL_TEXTURE_2D>::unbind();
   }
 
   void clear() {
-    glDeleteTextures(1, &tex); GLERROR
-    delete [] buf1;
-    delete [] buf2;
+    gl::Texture<GL_TEXTURE_2D>::clear(tex);
+    buf1.clear();
+    buf2.clear();
     if(extrabuf) {
-      delete [] finalbuf;
+      finalbuf.clear();
       extrabuf = false;
-      finalbuf = nullptr;
     }
-    buf1 = buf2 = nullptr;
   }
 };
 
-#include "Cellular.hpp"
-#include "Linear.hpp"
-
 template <>
-struct Board<cellular::Conway> {
+struct Renderer<cellular::Conway, storage_mode::Textures, access_mode::bounded> {
   using AUT = cellular::Conway;
   int w, h;
   int tw,th;
@@ -297,7 +255,7 @@ struct Board<cellular::Conway> {
 
   using ShaderProgram = decltype(compute);
 
-  Board(std::string s):
+  Renderer(std::string s):
     w(0), h(0),
     uSampler(s),
     compute({"shaders/conway.comp"})
@@ -306,7 +264,6 @@ struct Board<cellular::Conway> {
   void init(int w_, int h_, int zoom=0) {
     w=w_,h=h_;
     ShaderProgram::compile_program(compute);
-    ASSERT(compute.is_valid());
     if(!zoom)zoom=1;
     if(zoom > 0) {
       w_/=zoom,h_/=zoom;
@@ -317,14 +274,14 @@ struct Board<cellular::Conway> {
     uint8_t *buf = new uint8_t[w*h];
     for(int i=0;i<w*h;++i)buf[i]=AUT::init_state(i/w,i%w)?~uint8_t(0):0;
     for(GLuint *tex : {&tex1, &tex2}) {
-      glGenTextures(1, tex); GLERROR
-      glBindTexture(GL_TEXTURE_2D, *tex); GLERROR
+      gl::Texture<GL_TEXTURE_2D>::init(*tex);
+      gl::Texture<GL_TEXTURE_2D>::bind(*tex);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, buf); GLERROR
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); GLERROR
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); GLERROR
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); GLERROR
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); GLERROR
-      unbind();
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      gl::Texture<GL_TEXTURE_2D>::unbind();
     }
     delete [] buf;
   }
@@ -357,25 +314,24 @@ struct Board<cellular::Conway> {
   }
 
   void set_active(int index) {
-    glActiveTexture(GL_TEXTURE0 + index); GLERROR
+    gl::Texture<GL_TEXTURE_2D>::set_active(index);
   }
 
   void set_data(int index) {
     uSampler.set_data(index);
   }
 
-  void bind() {
-    GLuint tex = current_tex?tex1:tex2;
-    glBindTexture(GL_TEXTURE_2D, tex); GLERROR
+  void bind_texture() {
+    gl::Texture<GL_TEXTURE_2D>::bind(current_tex?tex1:tex2);
   }
 
-  void unbind() {
-    glBindTexture(GL_TEXTURE_2D, 0); GLERROR
+  void unbind_texture() {
+    gl::Texture<GL_TEXTURE_2D>::unbind();
   }
 
   void clear() {
-    glDeleteTextures(1, &tex1); GLERROR
-    glDeleteTextures(1, &tex2); GLERROR
+    gl::Texture<GL_TEXTURE_2D>::clear(tex1);
+    gl::Texture<GL_TEXTURE_2D>::clear(tex2);
     ShaderProgram::clear(compute);
   }
 };
@@ -385,13 +341,13 @@ int main(int argc, char *argv[]) {
 
   App app;
 
-  Board<cellular::Conway> board("uBoard"s);
+  Renderer<cellular::Conway, storage_mode::HostBuffer, access_mode::looped> automaton("grid"s);
   gl::VertexArray vao;
   gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2> attrVertex("vertex"s);
   gl::ShaderProgram<
     gl::VertexShader,
     gl::FragmentShader
-  > prog({"shaders/automaton.vert"s, "shaders/automaton.frag"s});
+  > prog({"shaders/aut4.vert"s, "shaders/aut4.frag"s});
 
   using ShaderAttrib = decltype(attrVertex);
   using ShaderProgram = decltype(prog);
@@ -415,31 +371,32 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = 16;
-      board.init(w.width(), w.height(), factor);
-      board.uSampler.set_id(prog.id());
+      const int factor = 2;
+      automaton.init(w.width(), w.height(), factor);
+      automaton.uSampler.set_id(prog.id());
       Logger::Info("init fin\n");
     },
     // display function
     [&](auto &w) mutable {
       // use program
       /* Logger::Info("draw\n"); */
-      board.update();
+      automaton.update();
+      // display
       ShaderProgram::use(prog);
-      board.set_active(0);
-      board.bind();
-      board.set_data(0);
+      automaton.set_active(0);
+      automaton.bind_texture();
+      automaton.set_data(0);
       gl::VertexArray::bind(vao);
       glDrawArrays(GL_TRIANGLES, 0, 6); GLERROR
       gl::VertexArray::unbind();
       // unuse
-      board.unbind();
+      automaton.unbind_texture();
       ShaderProgram::unuse();
     },
     // cleanup function
     [&](auto &w) mutable {
       Logger::Info("clear\n");
-      board.clear();
+      automaton.clear();
       ShaderAttrib::clear(attrVertex);
       gl::VertexArray::clear(vao);
       ShaderProgram::clear(prog);

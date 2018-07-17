@@ -15,7 +15,7 @@ else()
     message(WARNING "You are using unsupported compiler, and will probably have to change the source code.")
 endif()
 
-set(CMAKE_CXX_FLAGS "-std=c++1z -fopenmp")
+set(CMAKE_CXX_FLAGS "-std=c++1z -fopenmp -Wall")
 
 set(exec automaton)
 add_executable(${exec} ./main.cpp)

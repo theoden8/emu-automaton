@@ -5,10 +5,10 @@
 #include <vector>
 #include <tuple>
 
-#include "incgraphics.h"
-#include "Tuple.hpp"
-#include "Shader.hpp"
-#include "ShaderAttrib.hpp"
+#include <incgraphics.h>
+#include <Tuple.hpp>
+#include <Shader.hpp>
+#include <ShaderAttrib.hpp>
 
 namespace gl {
 template <typename... ShaderTs>
@@ -98,6 +98,7 @@ public:
     Tuple::for_each(shaders, [&](auto &s) mutable {
       s.clear();
     });
+    ASSERT(is_valid());
   }
 
   void bind_attrib(const std::vector <std::string> &locations) {
@@ -154,7 +155,6 @@ public:
     vao.bind();
     compile_program();
     bind_attrib(locations);
-    ASSERT(is_valid());
     gl::VertexArray::unbind();
   }
 
