@@ -6,6 +6,12 @@ Created by Kirill Rodriguez on 07/2018.
 
 The purpose of this project is to animate automata in order to provide intuition for understanding complexity, and is to evolve into a more efficient framework for investigating algorithms and topologies in the languages of various automata.
 
+# Demonstration
+
+This is a random **Day and night** simulation:
+
+![day_and_night](./images/day_and_night.gif)
+
 # Tools
 
 * c++17
