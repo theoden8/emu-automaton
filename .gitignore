@@ -2,3 +2,6 @@ build
 scrshots
 *.log
 *.gch
+*.rle
+*.plaintext
+*.life106
