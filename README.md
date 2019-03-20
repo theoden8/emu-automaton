@@ -10,7 +10,7 @@ The purpose of this project is to animate automata in order to provide intuition
 
 This is a random **Day and night** simulation:
 
-![day_and_night](./images/day_and_night.gif)
+[![day_and_night](./images/day_and_night.gif)](./images/day_and_night.mp4)
 
 # Tools
 
