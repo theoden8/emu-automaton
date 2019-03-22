@@ -16,10 +16,11 @@ This is a random **Day and night** simulation:
 
 * c++17
 * opengl 4, glew, glfw3
+* clang++
 
-# Implementations
+# Implementation
 
-Currently, the implementation uses a double-buffer of two GL_R8 textures of size proportional to the size of window.
+Currently, the implementation uses a double-buffer of two GL_R8 textures of sizes proportional to the size of window.
 
 An implementation using GLSL compute shader is attempted, but is not successful yet.
 
@@ -28,7 +29,10 @@ An implementation using GLSL compute shader is attempted, but is not successful 
 ```bash
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++
+cd ..
+make -C build
+./build/automata # running
 ```
 
 # References
