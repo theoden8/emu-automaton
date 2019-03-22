@@ -31,11 +31,11 @@ mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++
 cd ..
-# running
 make -C build
+# running
+./build/automaton
 ```
 
-./build/automaton
 # References
 
 * http://www.conwaylife.com/wiki/Main_Page
