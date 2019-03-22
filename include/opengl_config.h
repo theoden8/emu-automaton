@@ -3,5 +3,6 @@
   #include <OpenGL/gl3.h>
   #include <OpenGL/glext.h>
 #else
-  #include <GL/glext.h>       /* assert OpenGL 3.2 core profile available. */
+  #include <GL/gl.h>       /* assert OpenGL 3.2 core profile available. */
+  // #include <GL/glext.h>       /* assert OpenGL 3.2 core profile available. */
 #endif

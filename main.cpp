@@ -1,5 +1,6 @@
 #include <string>
 #include <cstdint>
+#include <cctype>
 
 #include <incgraphics.h>
 
@@ -15,12 +16,12 @@ using namespace std::literals::string_literals;
 
 GLFWwindow *g_window = nullptr;
 
-GLvoid debug_callback(GLenum source, GLenum type, GLuint id,
-                              GLuint severity, GLsizei length,
-                              const GLchar *message, const GLvoid *userParam)
-{
-  Logger::Info("%s\n", message);
-}
+/* GLvoid debug_callback(GLenum source, GLenum type, GLuint id, */
+/*                               GLuint severity, GLsizei length, */
+/*                               const GLchar *message, const GLvoid *userParam) */
+/* { */
+/*   Logger::Info("%s\n", message); */
+/* } */
 
 class Window {
 protected:
@@ -34,6 +35,7 @@ protected:
     ASSERT(vidmode != nullptr);
     width_ = vidmode->width;
     height_ = vidmode->height;
+    width_ = 1000, height_ = 1000;
     /* width_ = height_ = std::min(width_, height_); */
 
     /* glfwWindowHint(GLFW_SAMPLES, 4); */
@@ -112,11 +114,14 @@ public:
 };
 
 #include <Automaton.hpp>
+#include <RLEDecoder.hpp>
+#include <PlainDecoder.hpp>
+#include <Life106Decoder.hpp>
 
 template <typename AUT, typename StorageMode, typename AccessMode> struct Renderer;
 
 template <typename AUT, typename AccessMode>
-struct Renderer <AUT, storage_mode::HostBuffer, AccessMode> {
+struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
   using StorageT = Storage<AUT::dim, storage_mode::HostBuffer>;
   using AccessT = Access<AUT, StorageT, AccessMode>;
 
@@ -139,7 +144,7 @@ struct Renderer <AUT, storage_mode::HostBuffer, AccessMode> {
     color_per_state = (AUT::no_states == 0) ? 1 : UINT8_MAX / (AUT::no_states - 1);
   }
 
-  void init(int w_, int h_, int zoom=0) {
+  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) {
     if(zoom==0)zoom=1;
     if(zoom >= 0) {
       w_ /= zoom, h_ /= zoom;
@@ -156,10 +161,20 @@ struct Renderer <AUT, storage_mode::HostBuffer, AccessMode> {
     }
     buf1.init(w, h);
     buf2.init(w, h);
-    #pragma omp parallel for
-    for(int i = 0; i < w * h; ++i) {
-      buf1.data[i] = AUT::init_state(i / buf1.w, i % buf1.w) * color_per_state;
-      buf2.data[i] = 0;
+    for(int i=0;i<w*h;++i) {
+      buf1.data[i]=0;
+      buf2.data[i]=0;
+    }
+    if(filename == nullptr) {
+      #pragma omp parallel for
+      for(int i = 0; i < w * h; ++i) {
+        buf1.data[i] = AUT::init_state(i / buf1.w, i % buf1.w) * color_per_state;
+      }
+    } else {
+      RLEDecoder<StorageT>::read(filename, buf1);
+      /* Life106Decoder<StorageT>::read(filename, buf1); */
+      #pragma omp parallel for
+      for(int i=0;i<w*h;++i)buf1.data[i]*=color_per_state;
     }
     gl::Texture<GL_TEXTURE_2D>::init(tex);
     reinit_texture();
@@ -172,7 +187,7 @@ struct Renderer <AUT, storage_mode::HostBuffer, AccessMode> {
     }
     #pragma omp parallel for
     for(int i = 0; i < w*h; ++i) {
-      dstbuf.data[i] = AUT::next_state(make_grid<4>([=](int y, int x) -> typename StorageT::value_type {
+      dstbuf.data[i] = AUT::next_state(make_grid<4>([=](int y, int x) mutable -> typename StorageT::value_type {
         return AccessT::access(srcbuf, y, x) / color_per_state;
       }, w, h), i / w, i % w) * color_per_state;
     }
@@ -206,7 +221,7 @@ struct Renderer <AUT, storage_mode::HostBuffer, AccessMode> {
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    /* glGenerateMipmap(GL_TEXTURE_2D); GLERROR */
+    glGenerateMipmap(GL_TEXTURE_2D); GLERROR
     gl::Texture<GL_TEXTURE_2D>::unbind();
   }
 
@@ -244,8 +259,8 @@ struct Renderer <AUT, storage_mode::HostBuffer, AccessMode> {
 };
 
 template <>
-struct Renderer<cellular::Conway, storage_mode::Textures, access_mode::bounded> {
-  using AUT = cellular::Conway;
+struct Renderer<cellular::GameOfLife, storage_mode::Textures, access_mode::bounded> {
+  using AUT = cellular::GameOfLife;
   int w, h;
   int tw,th;
   gl::ShaderProgram<gl::ComputeShader> compute;
@@ -341,7 +356,7 @@ int main(int argc, char *argv[]) {
 
   App app;
 
-  Renderer<cellular::Conway, storage_mode::HostBuffer, access_mode::looped> automaton("grid"s);
+  Renderer<cellular::DayAndNight, storage_mode::HostBuffer, access_mode::looped> automaton("grid"s);
   gl::VertexArray vao;
   gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2> attrVertex("vertex"s);
   gl::ShaderProgram<
@@ -371,7 +386,7 @@ int main(int argc, char *argv[]) {
       // init shader program
       ShaderProgram::init(prog, vao, {"attrVertex"});
       // init texture
-      const int factor = 2;
+      const int factor = 1;
       automaton.init(w.width(), w.height(), factor);
       automaton.uSampler.set_id(prog.id());
       Logger::Info("init fin\n");
@@ -381,6 +396,7 @@ int main(int argc, char *argv[]) {
       // use program
       /* Logger::Info("draw\n"); */
       automaton.update();
+      /* usleep(1e4*10); */
       // display
       ShaderProgram::use(prog);
       automaton.set_active(0);

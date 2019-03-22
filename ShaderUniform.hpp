@@ -137,7 +137,7 @@ void Uniform<UniformType::MAT4>::set_data(Uniform<UniformType::MAT4>::dtype data
 template <>
 void Uniform<UniformType::SAMPLER2D>::set_data(Uniform<UniformType::SAMPLER2D>::dtype data) {
   CHECK_PROGRAM_ID;
-  glUniform1iARB(uniformId, data); GLERROR
+  glUniform1i(uniformId, data); GLERROR
 }
 
 #undef CHECK_PROGRAM_ID

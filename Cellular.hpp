@@ -69,11 +69,11 @@ namespace cellular {
   using Fredkin     =  ca::BS<ca::sequence<1,3,5,7>,     ca::sequence<0,2,4,6,8>>;
   using Seeds       =  ca::BS<ca::sequence<2>,           ca::sequence<>>;
   using LiveOrDie   =  ca::BS<ca::sequence<2>,           ca::sequence<0>>;
-  using LifeWtDeath =  ca::BS<ca::sequence<3>,           ca::sequence<0,1,2,4,5,6,7,8>>;
+
   using Flock       =  ca::BS<ca::sequence<3>,           ca::sequence<1,2>>;
   using Mazectric   =  ca::BS<ca::sequence<3>,           ca::sequence<1,2,3,4>>;
   using Maze        =  ca::BS<ca::sequence<3>,           ca::sequence<1,2,3,4,5>>;
-  using Conway      =  ca::BS<ca::sequence<3>,           ca::sequence<2,3>>;
+  using GameOfLife  =  ca::BS<ca::sequence<3>,           ca::sequence<2,3>>;
   using EightLife   =  ca::BS<ca::sequence<3>,           ca::sequence<2,3,8>>;
   using LongLife    =  ca::BS<ca::sequence<3,4,5>,       ca::sequence<5>>;
   using TxT         =  ca::BS<ca::sequence<3,6>,         ca::sequence<1,2,5>>;

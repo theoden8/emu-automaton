@@ -53,6 +53,7 @@ template <>
 struct Storage<4, storage_mode::HostBuffer> {
   int w=0, h=0;
 
+  static constexpr int dim = 4;
   using value_type = uint8_t;
   value_type *data = nullptr;
 
@@ -82,7 +83,7 @@ namespace access_mode {
 template <typename AUT, typename StorageT, typename Mode> struct Access;
 
 template <typename AUT>
-struct Access <AUT, Storage<4, storage_mode::HostBuffer>, access_mode::bounded> {
+struct Access<AUT, Storage<4, storage_mode::HostBuffer>, access_mode::bounded> {
   using StorageT = Storage<4, storage_mode::HostBuffer>;
   static typename StorageT::value_type access(const StorageT &s, int i) {
     return access(s, i / s.w, i % s.w);
@@ -97,14 +98,14 @@ struct Access <AUT, Storage<4, storage_mode::HostBuffer>, access_mode::bounded> 
 };
 
 template <typename AUT>
-struct Access <AUT, Storage<4, storage_mode::HostBuffer>, access_mode::looped> {
+struct Access<AUT, Storage<4, storage_mode::HostBuffer>, access_mode::looped> {
   using StorageT = Storage<4, storage_mode::HostBuffer>;
   static typename StorageT::value_type access(const StorageT &s, int i) {
     return access(s, i / s.w, i % s.w);
   }
   static typename StorageT::value_type access(const StorageT &s, int y, int x) {
     int w=s.w,h=s.h;
-    if(y < 0 || y > h || x < 0 || x > w) {
+    if(y < 0 || y >= h || x < 0 || x >= w) {
       y = (y < 0) ? y + h : y % h;
       x = (x < 0) ? x + w : x % w;
     }
