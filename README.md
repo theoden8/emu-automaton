@@ -14,9 +14,8 @@ This is a random **Day and night** simulation:
 
 # Tools
 
-* c++17
-* opengl 4, glew, glfw3
-* clang++
+* c++17, clang++
+* opengl 4, libepoxy
 
 # Implementation
 
