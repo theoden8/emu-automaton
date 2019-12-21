@@ -3,27 +3,53 @@
 #include "Debug.hpp"
 #include "Logger.hpp"
 
-#include <string>
 #include <cstdio>
 #include <cassert>
+#include <string>
+#include <vector>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/file.h>
 
 namespace sys {
-namespace HACK {
-  void rename_file(const char *a, const char *b) {
-    int err = rename(a, b);
-    if(err)perror( "Error renaming file");
-  }
+/* namespace HACK { */
+/*   void rename_file(const char *a, const char *b) { */
+/*     int err = rename(a, b); */
+/*     if(err)perror( "Error renaming file"); */
+/*   } */
 
-  static void swap_files(std::string a, std::string b) {
-    ASSERT(a != b);
-    const char *TMP = "dahfsjkgdhjsfgshjkgfdhjgfwfghjfhdgjsvfh";
-    rename_file(a.c_str(), TMP);
-    rename_file(b.c_str(), a.c_str());
-    rename_file(TMP, b.c_str());
+/*   static void swap_files(std::string a, std::string b) { */
+/*     ASSERT(a != b); */
+/*     const char *TMP = "dahfsjkgdhjsfgshjkgfdhjgfwfghjfhdgjsvfh"; */
+/*     rename_file(a.c_str(), TMP); */
+/*     rename_file(b.c_str(), a.c_str()); */
+/*     rename_file(TMP, b.c_str()); */
+/*   } */
+/* } */
+
+
+#ifdef __linux__
+static std::string get_executable_path() {
+  std::vector<char> buf(1000);
+  readlink("/proc/self/exe", buf.data(), 1000);
+  return std::string(buf.begin(), buf.end());
+}
+#endif
+
+std::string get_executable_directory(int argc, char *argv[]) {
+#ifdef __linux__
+  const std::string exec = get_executable_path();
+#else
+  const std::string exec = argv[0];
+#endif
+  std::string::size_type n = exec.rfind('/');
+  std::string folder;
+  if(n == std::string::npos) {
+    folder = "./";
+  } else {
+    folder = exec.substr(0, n + 1);
   }
+  return folder;
 }
 
 class File {

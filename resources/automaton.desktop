@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Life Emulator
+Type=Application
+Terminal=false
+Exec=automaton
+Icon=automaton
+Categories=Game;

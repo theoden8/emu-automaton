@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <cstring>
 #include <vector>
 
 #include <Window.hpp>
@@ -116,21 +117,22 @@ struct InterfaceApp {
             if (nk_option_label(ctx, "Rule 110" , autOption == Linear::RULE110)) autOption = Linear::RULE110;
             if (nk_option_label(ctx, "Rule 184" , autOption == Linear::RULE184)) autOption = Linear::RULE184;
           } else if(autType == CELLULAR) {
-            nk_layout_row_dynamic(ctx, 30, 6);
+            nk_layout_row_dynamic(ctx, 30, 4);
             if (nk_option_label(ctx, "Replicator"  , autOption == Cellular::REPLICATOR )) autOption = Cellular::REPLICATOR;
             if (nk_option_label(ctx, "Fredkin"     , autOption == Cellular::FREDKIN    )) autOption = Cellular::FREDKIN;
             if (nk_option_label(ctx, "Seeds"       , autOption == Cellular::SEEDS      )) autOption = Cellular::SEEDS;
             if (nk_option_label(ctx, "Live Or Die" , autOption == Cellular::LIVEORDIE  )) autOption = Cellular::LIVEORDIE;
+            nk_layout_row_dynamic(ctx, 30, 4);
             if (nk_option_label(ctx, "Flock"       , autOption == Cellular::FLOCK      )) autOption = Cellular::FLOCK;
             if (nk_option_label(ctx, "Mazectric"   , autOption == Cellular::MAZECTRIC  )) autOption = Cellular::MAZECTRIC;
-            nk_layout_row_dynamic(ctx, 30, 6);
             if (nk_option_label(ctx, "Maze"        , autOption == Cellular::MAZE       )) autOption = Cellular::MAZE;
             if (nk_option_label(ctx, "Game Of Life", autOption == Cellular::GAMEOFLIFE )) autOption = Cellular::GAMEOFLIFE;
+            nk_layout_row_dynamic(ctx, 30, 4);
             if (nk_option_label(ctx, "Eight Life"  , autOption == Cellular::EIGHTLIFE  )) autOption = Cellular::EIGHTLIFE;
             if (nk_option_label(ctx, "Long Life"   , autOption == Cellular::LONGLIFE   )) autOption = Cellular::LONGLIFE;
             if (nk_option_label(ctx, "TxT"         , autOption == Cellular::TXT        )) autOption = Cellular::TXT;
             if (nk_option_label(ctx, "High Life"   , autOption == Cellular::HIGHLIFE   )) autOption = Cellular::HIGHLIFE;
-            nk_layout_row_dynamic(ctx, 30, 5);
+            nk_layout_row_dynamic(ctx, 30, 4);
             if (nk_option_label(ctx, "Move"        , autOption == Cellular::MOVE       )) autOption = Cellular::MOVE;
             if (nk_option_label(ctx, "Stains"      , autOption == Cellular::STAINS     )) autOption = Cellular::STAINS;
             if (nk_option_label(ctx, "Day And Night",autOption == Cellular::DAYANDNIGHT)) autOption = Cellular::DAYANDNIGHT;

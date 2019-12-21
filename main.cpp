@@ -1,8 +1,11 @@
 #include <cstdint>
 #include <cctype>
 
+#include <string>
+
 #include <Logger.hpp>
 #include <Debug.hpp>
+#include <File.hpp>
 
 #include <Window.hpp>
 #include <InterfaceApp.hpp>
@@ -19,6 +22,8 @@ int main(int argc, char *argv[]) {
   Window w;
   w.init();
 
+  std::string dir = sys::get_executable_directory(argc, argv);
+
   bool shouldQuit = false;
   while(!shouldQuit) {
     InterfaceApp iface(w);
@@ -29,7 +34,7 @@ int main(int argc, char *argv[]) {
     }
     const int factor = iface.factor;
 
-    AutomatonApp app(w);
+    AutomatonApp app(w, dir);
     if(iface.autType == InterfaceApp::LINEAR) {
       switch(iface.autOption) {
         case InterfaceApp::Linear::RULE30 : app.run<linear::Rule30 >(factor); break;

@@ -1,14 +1,18 @@
 #pragma once
 
+#include <string>
+
 #include <Window.hpp>
 #include <Renderer.hpp>
 
 
 class AutomatonApp {
   Window w;
+  const std::string dir;
 public:
-  AutomatonApp(Window &w):
-    w(w)
+  AutomatonApp(Window &w, std::string &dir):
+    w(w),
+    dir(dir)
   {}
 
   template <typename AUT>
@@ -19,7 +23,7 @@ public:
     gl::ShaderProgram<
       gl::VertexShader,
       gl::FragmentShader
-    > prog({"shaders/aut4.vert"s, "shaders/aut4.frag"s});
+    > prog({dir+"shaders/aut4.vert"s, dir+"shaders/aut4.frag"s});
 
     using ShaderAttrib = decltype(attrVertex);
     using ShaderProgram = decltype(prog);

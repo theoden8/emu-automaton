@@ -15,12 +15,18 @@ else()
     message(WARNING "You are using unsupported compiler, and will probably have to change the source code.")
 endif()
 
-# set(CMAKE_CXX_FLAGS "-std=c++17 -fopenmp -Wall")
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall")
+if(UNIX AND NOT APPLE)
+  set(CMAKE_CXX_FLAGS "-std=c++17 -fopenmp -Wall")
+else()
+  set(CMAKE_CXX_FLAGS "-std=c++17 -Wall")
+endif()
 
 set(exec automaton)
 add_executable(${exec} ./main.cpp)
 include_directories($(CMAKE_CURRENT_SOURCE_DIR))
+
+file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
 
 find_package(PkgConfig REQUIRED)
 
@@ -40,6 +46,23 @@ target_link_libraries(${exec}
   PkgConfig::GLFW3
   PkgConfig::GLM
 )
+
+include(ExternalProject)
+ExternalProject_Add(Nuklear
+    GIT_REPOSITORY https://github.com/Immediate-Mode-UI/Nuklear
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ""
+    )
+include_directories(${CMAKE_BINARY_DIR}/Nuklear-prefix/src)
+add_dependencies(${exec} Nuklear)
+
+if(UNIX)
+  install(DIRECTORY resources DESTINATION "${CMAKE_INSTALL_PREFIX}/..")
+  install(TARGETS ${exec} DESTINATION "${CMAKE_INSTALL_PREFIX}")
+  install(DIRECTORY shaders DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
+  install(DIRECTORY resources DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
+endif(UNIX)
 
 # find_package(EPOXY REQUIRED)
 # pkg_search_module(EPOXY REQUIRED epoxy)
