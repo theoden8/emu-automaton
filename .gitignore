@@ -4,3 +4,6 @@ build
 *.rle
 *.plaintext
 *.life106
+Nuklear
+.ropeproject
+*.ttf
