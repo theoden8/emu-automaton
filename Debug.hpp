@@ -5,11 +5,11 @@
 #include <string>
 
 #ifdef COMPILE_GLDEBUG
-#include "incgraphics.h"
+#include <incgraphics.h>
 #endif
 
 #ifdef COMPILE_ALDEBUG
-#include "incaudio.h"
+#include <incaudio.h>
 #endif
 
 #define STR(x) #x

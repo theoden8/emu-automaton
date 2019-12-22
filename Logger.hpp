@@ -3,11 +3,11 @@
 #include <cstdarg>
 #include <string>
 #include <cstdlib>
-#include <unistd.h>
 
 #include <mutex>
 
-#include "Debug.hpp"
+#include <File.hpp>
+#include <Debug.hpp>
 
 class Logger {
   std::string filename;
@@ -21,8 +21,8 @@ class Logger {
     filename(filename)
   {
     /* #ifndef NDEBUG */
+      sys::File::truncate(this->filename);
       file = fopen(this->filename.c_str(), "w");
-      ftruncate(fileno(file), 0);
       ASSERT(file != nullptr);
     /* #endif */
   }
@@ -86,6 +86,7 @@ public:
     va_end(argptr);
   }
   static void MirrorLog(FILE *redir) {
+    #ifdef __unix__
     ASSERT(instance != nullptr);
     if(instance->file == nullptr) {
       return;
@@ -96,6 +97,7 @@ public:
       perror("error");
       errno=0;
     }
+    #endif
   }
   static void Close() {
     Logger::Info("Closing log %s", instance->filename.c_str());

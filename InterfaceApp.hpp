@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <cstring>
 #include <vector>
 
@@ -61,14 +60,15 @@ struct InterfaceApp {
   };
 
   static constexpr int LINEAR = 0, CELLULAR = 1;
+  const std::string dir;
 
   int autType = CELLULAR;
   int autOption = Cellular::DAYANDNIGHT;
   bool finished = false;
   bool shouldQuit = false;
 
-  InterfaceApp(Window &w):
-    w(w)
+  InterfaceApp(Window &w, const std::string &dir):
+    w(w), dir(dir)
   {}
 
   void run() {
@@ -76,11 +76,11 @@ struct InterfaceApp {
       // setup
       [&](auto &w) mutable -> void {
         ctx = nk_glfw3_init(g_window, NK_GLFW3_INSTALL_CALLBACKS);
-        Logger::Info("ctx %p\n", ctx);
+        /* Logger::Info("ctx %p\n", ctx); */
         {
           struct nk_font_atlas *atlas;
           nk_glfw3_font_stash_begin(&atlas);
-          struct nk_font *droid = nk_font_atlas_add_from_file(atlas, "resources/DroidSans.ttf", 24, 0);
+          struct nk_font *droid = nk_font_atlas_add_from_file(atlas, (dir+"resources/DroidSans.ttf").c_str(), 24, 0);
           /*struct nk_font *roboto = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/Roboto-Regular.ttf", 14, 0);*/
           /*struct nk_font *future = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/kenvector_future_thin.ttf", 13, 0);*/
           /*struct nk_font *clean = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/ProggyClean.ttf", 12, 0);*/
@@ -130,7 +130,7 @@ struct InterfaceApp {
             nk_layout_row_dynamic(ctx, 30, 4);
             if (nk_option_label(ctx, "Eight Life"  , autOption == Cellular::EIGHTLIFE  )) autOption = Cellular::EIGHTLIFE;
             if (nk_option_label(ctx, "Long Life"   , autOption == Cellular::LONGLIFE   )) autOption = Cellular::LONGLIFE;
-            if (nk_option_label(ctx, "TxT"         , autOption == Cellular::TXT        )) autOption = Cellular::TXT;
+            if (nk_option_label(ctx, "2x2"         , autOption == Cellular::TXT        )) autOption = Cellular::TXT;
             if (nk_option_label(ctx, "High Life"   , autOption == Cellular::HIGHLIFE   )) autOption = Cellular::HIGHLIFE;
             nk_layout_row_dynamic(ctx, 30, 4);
             if (nk_option_label(ctx, "Move"        , autOption == Cellular::MOVE       )) autOption = Cellular::MOVE;

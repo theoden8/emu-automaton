@@ -11,22 +11,36 @@
 #include <InterfaceApp.hpp>
 #include <AutomatonApp.hpp>
 
+#if !defined(_POSIX_VERSION)
+#include <direct.h>
+#endif
+
 using namespace std::literals::string_literals;
 
 
 int main(int argc, char *argv[]) {
   srand(time(NULL));
   Logger::Setup("app.log");
-  Logger::MirrorLog(stderr);
+  /* Logger::MirrorLog(stderr); */
 
   Window w;
   w.init();
 
-  std::string dir = sys::get_executable_directory(argc, argv);
+#if defined(_POSIX_VERSION)
+  char buf[PATH_MAX + 1];
+  getcwd(buf, PATH_MAX);
+  Logger::Info("cwd: '%s'\n", buf);
+#else
+  char buf[MAX_PATH + 1];
+  _getcwd(buf, MAX_PATH);
+  Logger::Info("cwd: '%s'\n", buf);
+#endif
+  const std::string dir = sys::get_executable_directory(argc, argv);
+  Logger::Info("dir '%s'\n", dir.c_str());
 
   bool shouldQuit = false;
   while(!shouldQuit) {
-    InterfaceApp iface(w);
+    InterfaceApp iface(w, dir);
     iface.run();
     shouldQuit = iface.shouldQuit;
     if(shouldQuit) {

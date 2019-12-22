@@ -33,7 +33,7 @@ protected:
     ASSERT(vidmode != nullptr);
     width_ = vidmode->width;
     height_ = vidmode->height;
-    width_ = 1000, height_ = 1000;
+    width_ = 800, height_ = 800;
     /* width_ = height_ = std::min(width_, height_); */
 
     /* glfwWindowHint(GLFW_SAMPLES, 4); */

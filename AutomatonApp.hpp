@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <Window.hpp>
 #include <Renderer.hpp>
@@ -10,7 +11,7 @@ class AutomatonApp {
   Window w;
   const std::string dir;
 public:
-  AutomatonApp(Window &w, std::string &dir):
+  AutomatonApp(Window &w, const std::string &dir):
     w(w),
     dir(dir)
   {}
@@ -23,7 +24,10 @@ public:
     gl::ShaderProgram<
       gl::VertexShader,
       gl::FragmentShader
-    > prog({dir+"shaders/aut4.vert"s, dir+"shaders/aut4.frag"s});
+    > prog({
+      std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("aut4.vert"s)),
+      std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("aut4.frag"s))
+    });
 
     using ShaderAttrib = decltype(attrVertex);
     using ShaderProgram = decltype(prog);
@@ -34,10 +38,11 @@ public:
         Logger::Info("init\n");
         // init attribute vertex
         ShaderAttrib::init(attrVertex);
-        attrVertex.allocate<GL_STATIC_DRAW>(6, (float[]){
-          1,1, -1,1, -1,-1,
-          -1,-1, 1,1, 1,-1,
-        });
+		std::vector<float> points = {
+		  1,1, -1,1, -1,-1,
+		  -1,-1, 1,1, 1,-1,
+		};
+        attrVertex.allocate<GL_STATIC_DRAW>(6, points.data());
         // add the attribute to the vertex array
         gl::VertexArray::init(vao);
         gl::VertexArray::bind(vao);
