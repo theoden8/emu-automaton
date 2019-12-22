@@ -72,6 +72,7 @@ struct InterfaceApp {
   {}
 
   void run() {
+    w.update_size();
     w.run(
       // setup
       [&](auto &w) mutable -> void {

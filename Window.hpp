@@ -76,6 +76,11 @@ public:
     init_controls();
     /* glDebugMessageCallbackARB(&debug_callback, nullptr); GLERROR */
   }
+  void update_size() {
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+    width_=w, height_=h;
+  }
   template <typename SF, typename DF, typename CF>
   void run(SF &&setupfunc, DF &&dispfunc, CF &&cleanupfunc) {
     setupfunc(*this);

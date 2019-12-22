@@ -18,6 +18,7 @@ public:
 
   template <typename AUT>
   void run(int factor) {
+    w.update_size();
     Renderer<AUT, storage_mode::HostBuffer, access_mode::looped> automaton("grid"s);
     gl::VertexArray vao;
     gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2> attrVertex("vertex"s);
