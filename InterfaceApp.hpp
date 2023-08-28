@@ -3,6 +3,7 @@
 #include <cstring>
 #include <vector>
 
+#include <String.hpp>
 #include <Window.hpp>
 
 #define NK_INCLUDE_FIXED_TYPES
@@ -16,13 +17,14 @@
 #define NK_GLFW_GL3_IMPLEMENTATION
 #include <Nuklear/nuklear.h>
 #include <Nuklear/demo/glfw_opengl3/nuklear_glfw_gl3.h>
-#include <Nuklear/demo/style.c>
+#include <Nuklear/demo/common/style.c>
 
 #define MAX_VERTEX_BUFFER (512 * 1024)
 #define MAX_ELEMENT_BUFFER (128 * 1024)
 
 struct InterfaceApp {
   Window &w;
+  struct nk_glfw nkglfw = {0};
   const std::vector<int> factors = {-4, -2, 1, 2, 4, 8, 16, 32};
   int factor = 2;
 
@@ -56,11 +58,13 @@ struct InterfaceApp {
    DAYANDNIGHT,
    DRYLIFE,
    PEDESTRLIFE,
+   AMOEBA,
+   DIAMOEBA,
    NO_CELLULAR
   };
 
   static constexpr int LINEAR = 0, CELLULAR = 1;
-  const std::string dir;
+  const sys::Path root_path;
 
   int autType = CELLULAR;
   int autOption = Cellular::DAYANDNIGHT;
@@ -68,7 +72,7 @@ struct InterfaceApp {
   bool shouldQuit = false;
 
   InterfaceApp(Window &w, const std::string &dir):
-    w(w), dir(dir)
+    w(w), root_path(dir)
   {}
 
   void run() {
@@ -76,18 +80,20 @@ struct InterfaceApp {
     w.run(
       // setup
       [&](auto &w) mutable -> void {
-        ctx = nk_glfw3_init(g_window, NK_GLFW3_INSTALL_CALLBACKS);
+        ctx = nk_glfw3_init(&nkglfw, g_window, NK_GLFW3_INSTALL_CALLBACKS);
         /* Logger::Info("ctx %p\n", ctx); */
         {
           struct nk_font_atlas *atlas;
-          nk_glfw3_font_stash_begin(&atlas);
-          struct nk_font *droid = nk_font_atlas_add_from_file(atlas, (dir+"resources/DroidSans.ttf").c_str(), 24, 0);
+          nk_glfw3_font_stash_begin(&nkglfw, &atlas);
+          const sys::Path font_path = root_path / sys::Path("resources"s) / sys::Path("DroidSans.ttf"s);
+          Logger::Info("loading font from %s", std::string(font_path).c_str());
+          struct nk_font *droid = nk_font_atlas_add_from_file(atlas, std::string(font_path).c_str(), 24, 0);
           /*struct nk_font *roboto = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/Roboto-Regular.ttf", 14, 0);*/
           /*struct nk_font *future = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/kenvector_future_thin.ttf", 13, 0);*/
           /*struct nk_font *clean = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/ProggyClean.ttf", 12, 0);*/
           /*struct nk_font *tiny = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/ProggyTiny.ttf", 10, 0);*/
           /*struct nk_font *cousine = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/Cousine-Regular.ttf", 13, 0);*/
-          nk_glfw3_font_stash_end();
+          nk_glfw3_font_stash_end(&nkglfw);
           /* nk_style_load_all_cursors(ctx, atlas->cursors); */
           nk_style_set_font(ctx, &droid->handle);
         }
@@ -95,7 +101,7 @@ struct InterfaceApp {
       },
       // display
       [&](auto &w) mutable -> bool {
-        nk_glfw3_new_frame();
+        nk_glfw3_new_frame(&nkglfw);
         if (nk_begin(ctx, "Automaton Menu", nk_rect(25, 25, w.width()-50, w.height()-50),
               NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
               NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
@@ -138,7 +144,10 @@ struct InterfaceApp {
             if (nk_option_label(ctx, "Stains"      , autOption == Cellular::STAINS     )) autOption = Cellular::STAINS;
             if (nk_option_label(ctx, "Day And Night",autOption == Cellular::DAYANDNIGHT)) autOption = Cellular::DAYANDNIGHT;
             if (nk_option_label(ctx, "Dry Life"    , autOption == Cellular::DRYLIFE    )) autOption = Cellular::DRYLIFE;
+            nk_layout_row_dynamic(ctx, 30, 4);
             if (nk_option_label(ctx, "Pedestr Life", autOption == Cellular::PEDESTRLIFE)) autOption = Cellular::PEDESTRLIFE;
+            if (nk_option_label(ctx, "Amoeba"      , autOption == Cellular::AMOEBA     )) autOption = Cellular::AMOEBA;
+            if (nk_option_label(ctx, "Diamoeba"    , autOption == Cellular::DIAMOEBA   )) autOption = Cellular::DIAMOEBA;
           }
           /* nk_group_end(ctx); */
 
@@ -174,7 +183,7 @@ struct InterfaceApp {
              * defaults everything back into a default state.
              * Make sure to either a.) save and restore or b.) reset your own state after
              * rendering the UI. */
-            nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
+            nk_glfw3_render(&nkglfw, NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
           }
           return !finished;
         } else {
@@ -183,7 +192,7 @@ struct InterfaceApp {
       },
       // quit
       [&](auto &w) mutable -> void {
-        nk_glfw3_shutdown();
+        nk_glfw3_shutdown(&nkglfw);
       }
     );
   }
