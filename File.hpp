@@ -60,7 +60,11 @@ std::string get_executable_directory(int argc, char *argv[]) {
   GetModuleFileName(nullptr, buf.data(), MAX_PATH);
   const std::string exec(buf.begin(), buf.end());
 #else
-  const std::string exec = "";
+  std::string x = "";
+  if(argv[0][0] == '/') {
+    x = argv[0];
+  }
+  const std::string exec = x;
 #endif
 #if defined _WIN32 || defined __CYGWIN__
 #define FILE_SEPARATOR '\\'

@@ -7,8 +7,8 @@
 
 template <typename StorageT> struct Life106Decoder;
 
-template <typename Mode> struct Life106Decoder<Storage<4, Mode>> {
-  using StorageT = Storage<4, Mode>;
+template <typename Mode> struct Life106Decoder<RenderStorage<Mode>> {
+  using StorageT = RenderStorage<Mode>;
   static void read(const char *filename, StorageT &buf) {
     FILE *fp = fopen(filename, "r");
     filestream fs(fp);
@@ -26,8 +26,8 @@ template <typename Mode> struct Life106Decoder<Storage<4, Mode>> {
         cx=fs.get_int();
         cy=fs.get_int();
         points.push_back({cx,cy});
-        if(cx>mxx)mxx=cx;if(cx<mnx)mnx=cx;
-        if(cy>mxy)mxy=cy;if(cy<mny)mny=cy;
+        if(cx>mxx){mxx=cx;}if(cx<mnx){mnx=cx;}
+        if(cy>mxy){mxy=cy;}if(cy<mny){mny=cy;}
       }
     }
     if(!points.empty()) {

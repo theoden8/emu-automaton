@@ -41,33 +41,50 @@ struct InterfaceApp {
   };
 
   enum Cellular : int {
-   REPLICATOR,
-   FREDKIN,
-   SEEDS,
-   LIVEORDIE,
-   FLOCK,
-   MAZECTRIC,
-   MAZE,
-   GAMEOFLIFE,
-   EIGHTLIFE,
-   LONGLIFE,
-   TXT,
-   HIGHLIFE,
-   MOVE,
-   STAINS,
-   DAYANDNIGHT,
-   DRYLIFE,
-   PEDESTRLIFE,
-   AMOEBA,
-   DIAMOEBA,
-   NO_CELLULAR
+    // 2 states
+    REPLICATOR,
+    FREDKIN,
+    SEEDS,
+    LIVEORDIE,
+    FLOCK,
+    MAZECTRIC,
+    MAZE,
+    GAMEOFLIFE,
+    EIGHTLIFE,
+    LONGLIFE,
+    TXT,
+    HIGHLIFE,
+    MOVE,
+    STAINS,
+    DAYANDNIGHT,
+    ANNEAL,
+    DRYLIFE,
+    PEDESTRLIFE,
+    AMOEBA,
+    DIAMOEBA,
+    LANGTONSANT,
+    // 3 states
+    BRIANSBRAIN,
+    // 4 states
+    WIREWORLD,
+    NO_CELLULAR
   };
 
-  static constexpr int LINEAR = 0, CELLULAR = 1;
+  enum Probabilistic : int {
+    // 2 states
+    ISING,
+    NO_PROBABILISTIC
+  };
+
+  enum AutomataType : int {
+    LINEAR, CELLULAR, PROBABILISTIC,
+  };
   const sys::Path root_path;
 
   int autType = CELLULAR;
+  int autStates = 2;
   int autOption = Cellular::DAYANDNIGHT;
+  float isingBeta = .5;
   bool finished = false;
   bool shouldQuit = false;
 
@@ -109,45 +126,93 @@ struct InterfaceApp {
           nk_layout_row_dynamic(ctx, 30, 1);
           nk_label(ctx, "Automaton type", NK_TEXT_CENTERED);
           /* ASSERT(nk_group_begin(ctx, "Type", NK_WINDOW_BORDER)); */
-          if (nk_option_label(ctx, "Linear"  , autType == LINEAR)) autType = LINEAR;
-          if (nk_option_label(ctx, "Cellular", autType == CELLULAR)) autType = CELLULAR;
+          if(nk_option_label(ctx, "Linear", autType == AutomataType::LINEAR)) {
+            if(autType != AutomataType::LINEAR) {
+              autOption = 0;
+            }
+            autType = AutomataType::LINEAR;
+          }
+          if(nk_option_label(ctx, "Cellular", autType == AutomataType::CELLULAR)) {
+            if(autType != AutomataType::CELLULAR) {
+              autOption = 0;
+            }
+            autType = AutomataType::CELLULAR;
+          }
+          if(nk_option_label(ctx, "Probabilistic", autType == AutomataType::PROBABILISTIC)) {
+            if(autType != AutomataType::PROBABILISTIC) {
+              autOption = 0;
+            }
+            autType = AutomataType::PROBABILISTIC;
+          }
           /* nk_group_end(ctx); */
+          {
+            char aut_states_s[256];
+            snprintf(aut_states_s, sizeof(aut_states_s), "States %d", autStates);
+            nk_layout_row_dynamic(ctx, 30, 1);
+            nk_label(ctx, aut_states_s, NK_TEXT_LEFT);
+            nk_slider_int(ctx, 2, &autStates, 4, 1);
+          }
 
           /* ASSERT(nk_group_begin(ctx, "Automaton", NK_WINDOW_BORDER)); */
           nk_layout_row_dynamic(ctx, 30, 1);
           nk_label(ctx, "Automaton", NK_TEXT_CENTERED);
-          if(autType == LINEAR) {
-            nk_layout_row_dynamic(ctx, 30, 5);
-            if (nk_option_label(ctx, "Rule 30"  , autOption == Linear::RULE30 )) autOption = Linear::RULE30;
-            if (nk_option_label(ctx, "Rule 54"  , autOption == Linear::RULE54 )) autOption = Linear::RULE54;
-            if (nk_option_label(ctx, "Rule 90"  , autOption == Linear::RULE90 )) autOption = Linear::RULE90;
-            if (nk_option_label(ctx, "Rule 110" , autOption == Linear::RULE110)) autOption = Linear::RULE110;
-            if (nk_option_label(ctx, "Rule 184" , autOption == Linear::RULE184)) autOption = Linear::RULE184;
-          } else if(autType == CELLULAR) {
-            nk_layout_row_dynamic(ctx, 30, 4);
-            if (nk_option_label(ctx, "Replicator"  , autOption == Cellular::REPLICATOR )) autOption = Cellular::REPLICATOR;
-            if (nk_option_label(ctx, "Fredkin"     , autOption == Cellular::FREDKIN    )) autOption = Cellular::FREDKIN;
-            if (nk_option_label(ctx, "Seeds"       , autOption == Cellular::SEEDS      )) autOption = Cellular::SEEDS;
-            if (nk_option_label(ctx, "Live Or Die" , autOption == Cellular::LIVEORDIE  )) autOption = Cellular::LIVEORDIE;
-            nk_layout_row_dynamic(ctx, 30, 4);
-            if (nk_option_label(ctx, "Flock"       , autOption == Cellular::FLOCK      )) autOption = Cellular::FLOCK;
-            if (nk_option_label(ctx, "Mazectric"   , autOption == Cellular::MAZECTRIC  )) autOption = Cellular::MAZECTRIC;
-            if (nk_option_label(ctx, "Maze"        , autOption == Cellular::MAZE       )) autOption = Cellular::MAZE;
-            if (nk_option_label(ctx, "Game Of Life", autOption == Cellular::GAMEOFLIFE )) autOption = Cellular::GAMEOFLIFE;
-            nk_layout_row_dynamic(ctx, 30, 4);
-            if (nk_option_label(ctx, "Eight Life"  , autOption == Cellular::EIGHTLIFE  )) autOption = Cellular::EIGHTLIFE;
-            if (nk_option_label(ctx, "Long Life"   , autOption == Cellular::LONGLIFE   )) autOption = Cellular::LONGLIFE;
-            if (nk_option_label(ctx, "2x2"         , autOption == Cellular::TXT        )) autOption = Cellular::TXT;
-            if (nk_option_label(ctx, "High Life"   , autOption == Cellular::HIGHLIFE   )) autOption = Cellular::HIGHLIFE;
-            nk_layout_row_dynamic(ctx, 30, 4);
-            if (nk_option_label(ctx, "Move"        , autOption == Cellular::MOVE       )) autOption = Cellular::MOVE;
-            if (nk_option_label(ctx, "Stains"      , autOption == Cellular::STAINS     )) autOption = Cellular::STAINS;
-            if (nk_option_label(ctx, "Day And Night",autOption == Cellular::DAYANDNIGHT)) autOption = Cellular::DAYANDNIGHT;
-            if (nk_option_label(ctx, "Dry Life"    , autOption == Cellular::DRYLIFE    )) autOption = Cellular::DRYLIFE;
-            nk_layout_row_dynamic(ctx, 30, 4);
-            if (nk_option_label(ctx, "Pedestr Life", autOption == Cellular::PEDESTRLIFE)) autOption = Cellular::PEDESTRLIFE;
-            if (nk_option_label(ctx, "Amoeba"      , autOption == Cellular::AMOEBA     )) autOption = Cellular::AMOEBA;
-            if (nk_option_label(ctx, "Diamoeba"    , autOption == Cellular::DIAMOEBA   )) autOption = Cellular::DIAMOEBA;
+          if(autType == AutomataType::LINEAR) {
+            if(autStates == 2) {
+              nk_layout_row_dynamic(ctx, 30, 5);
+              if (nk_option_label(ctx, "Rule 30"  , autOption == Linear::RULE30 )) autOption = Linear::RULE30;
+              if (nk_option_label(ctx, "Rule 54"  , autOption == Linear::RULE54 )) autOption = Linear::RULE54;
+              if (nk_option_label(ctx, "Rule 90"  , autOption == Linear::RULE90 )) autOption = Linear::RULE90;
+              if (nk_option_label(ctx, "Rule 110" , autOption == Linear::RULE110)) autOption = Linear::RULE110;
+              if (nk_option_label(ctx, "Rule 184" , autOption == Linear::RULE184)) autOption = Linear::RULE184;
+            }
+          } else if(autType == AutomataType::CELLULAR) {
+            if(autStates == 2) {
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Replicator"  , autOption == Cellular::REPLICATOR )) autOption = Cellular::REPLICATOR;
+              if (nk_option_label(ctx, "Fredkin"     , autOption == Cellular::FREDKIN    )) autOption = Cellular::FREDKIN;
+              if (nk_option_label(ctx, "Seeds"       , autOption == Cellular::SEEDS      )) autOption = Cellular::SEEDS;
+              if (nk_option_label(ctx, "Live Or Die" , autOption == Cellular::LIVEORDIE  )) autOption = Cellular::LIVEORDIE;
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Flock"       , autOption == Cellular::FLOCK      )) autOption = Cellular::FLOCK;
+              if (nk_option_label(ctx, "Mazectric"   , autOption == Cellular::MAZECTRIC  )) autOption = Cellular::MAZECTRIC;
+              if (nk_option_label(ctx, "Maze"        , autOption == Cellular::MAZE       )) autOption = Cellular::MAZE;
+              if (nk_option_label(ctx, "Game Of Life", autOption == Cellular::GAMEOFLIFE )) autOption = Cellular::GAMEOFLIFE;
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Eight Life"  , autOption == Cellular::EIGHTLIFE  )) autOption = Cellular::EIGHTLIFE;
+              if (nk_option_label(ctx, "Long Life"   , autOption == Cellular::LONGLIFE   )) autOption = Cellular::LONGLIFE;
+              if (nk_option_label(ctx, "2x2"         , autOption == Cellular::TXT        )) autOption = Cellular::TXT;
+              if (nk_option_label(ctx, "High Life"   , autOption == Cellular::HIGHLIFE   )) autOption = Cellular::HIGHLIFE;
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Move"        , autOption == Cellular::MOVE       )) autOption = Cellular::MOVE;
+              if (nk_option_label(ctx, "Stains"      , autOption == Cellular::STAINS     )) autOption = Cellular::STAINS;
+              if (nk_option_label(ctx, "Day And Night",autOption == Cellular::DAYANDNIGHT)) autOption = Cellular::DAYANDNIGHT;
+              if (nk_option_label(ctx, "Anneal"      , autOption == Cellular::ANNEAL     )) autOption = Cellular::ANNEAL;
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Dry Life"    , autOption == Cellular::DRYLIFE    )) autOption = Cellular::DRYLIFE;
+              if (nk_option_label(ctx, "Pedestr Life", autOption == Cellular::PEDESTRLIFE)) autOption = Cellular::PEDESTRLIFE;
+              if (nk_option_label(ctx, "Amoeba"      , autOption == Cellular::AMOEBA     )) autOption = Cellular::AMOEBA;
+              if (nk_option_label(ctx, "Diamoeba"    , autOption == Cellular::DIAMOEBA   )) autOption = Cellular::DIAMOEBA;
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Langton's Ant",autOption == Cellular::LANGTONSANT)) autOption = Cellular::LANGTONSANT;
+            } else if(autStates == 3) {
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Brian's Brain",autOption == Cellular::BRIANSBRAIN)) autOption = Cellular::BRIANSBRAIN;
+            } else if(autStates == 4) {
+              nk_layout_row_dynamic(ctx, 30, 4);
+              if (nk_option_label(ctx, "Wireworld"    ,autOption == Cellular::WIREWORLD  )) autOption = Cellular::WIREWORLD;
+            }
+          } else if(autType == AutomataType::PROBABILISTIC) {
+            if(autStates == 2) {
+              nk_layout_row_dynamic(ctx, 30, 1);
+              if (nk_option_label(ctx, "Ising", autOption == Probabilistic::ISING)) autOption = Probabilistic::ISING;
+              if(autOption == Probabilistic::ISING) {
+                char beta_s[256];
+                snprintf(beta_s, sizeof(beta_s), "beta %.3f", isingBeta);
+                nk_layout_row_dynamic(ctx, 30, 2);
+                nk_label(ctx, beta_s, NK_TEXT_LEFT);
+                nk_slider_float(ctx, .010, &isingBeta, 10., .010);
+              }
+            }
           }
           /* nk_group_end(ctx); */
 

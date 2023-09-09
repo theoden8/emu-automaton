@@ -33,6 +33,7 @@ template <int N, uint64_t C> struct Rule {
   static constexpr int no_states = 2;
   static constexpr int no_neighbours = N;
   static constexpr int dim = 4;
+  static constexpr int update_mode = ::update_mode::ALL;
   static void check() { static_assert(N <= 6 && (N & 1)); }
   static inline uint8_t init_state(int y, int x) {
     /* if(y == 0) { */

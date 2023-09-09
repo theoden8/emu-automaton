@@ -19,31 +19,36 @@ template <typename AUT, typename StorageMode, typename AccessMode> struct Render
 
 template <typename AUT, typename AccessMode>
 struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
-  using StorageT = Storage<AUT::dim, storage_mode::HostBuffer>;
+  using StorageT = RenderStorage<storage_mode::HostBuffer>;
   using AccessT = Access<AUT, StorageT, AccessMode>;
 
+  AUT &aut;
   int w, h;
   int tw, th;
 
-  int color_per_state;
-
   GLuint tex = 0;
   gl::Uniform<gl::UniformType::SAMPLER2D> uSampler;
+  gl::Uniform<gl::UniformType::INTEGER> uNstates;
 
   int8_t current_buf = 0;
+  static constexpr bool doublebuffer = (AUT::update_mode == ::update_mode::ALL);
   bool extrabuf = false;
   StorageT finalbuf, buf1, buf2;
 
-  Renderer(std::string uniform_name):
+  const int color_per_state;
+
+  explicit Renderer(AUT &aut, const std::string &u_sampler_name, const std::string &u_nstates_name):
+    aut(aut),
     w(0), h(0),
-    uSampler(uniform_name.c_str())
-  {
-    color_per_state = (AUT::no_states == 0) ? 1 : UINT8_MAX / (AUT::no_states - 1);
-  }
+    tw(0), th(0),
+    uSampler(u_sampler_name.c_str()),
+    uNstates(u_nstates_name.c_str()),
+    color_per_state(UINT8_MAX / (AUT::no_states - 1))
+  {}
 
   void init(int w_, int h_, int zoom=0, const char *filename=nullptr) {
     if(zoom==0)zoom=1;
-    if(zoom >= 0) {
+    if(zoom > 0) {
       w_ /= zoom, h_ /= zoom;
       tw = w_, th = h_;
     } else if(zoom < 0) {
@@ -57,43 +62,66 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
       finalbuf.init(tw, th);
     }
     buf1.init(w, h);
-    buf2.init(w, h);
+    if constexpr(doublebuffer) {
+      buf2.init(w, h);
+    }
     for(int i=0;i<w*h;++i) {
-      buf1.data[i]=0;
-      buf2.data[i]=0;
+      buf1.buffer[i]=0;
+      if constexpr(doublebuffer) {
+        buf2.buffer[i]=0;
+      }
     }
     if(filename == nullptr) {
       #pragma omp parallel for
       for(int i = 0; i < w * h; ++i) {
-        buf1.data[i] = AUT::init_state(i / buf1.w, i % buf1.w) * color_per_state;
+        buf1.buffer[i] = AUT::init_state(i / buf1.w, i % buf1.w) * color_per_state;
       }
     } else {
       RLEDecoder<StorageT>::read(filename, buf1);
       /* Life106Decoder<StorageT>::read(filename, buf1); */
       #pragma omp parallel for
-      for(int i=0;i<w*h;++i)buf1.data[i]*=color_per_state;
+      for(int i=0;i<w*h;++i)buf1.buffer[i]*=color_per_state;
     }
     gl::Texture<GL_TEXTURE_2D>::init(tex);
     reinit_texture();
   }
 
   void update() {
-    StorageT srcbuf = buf1, dstbuf = buf2;
-    if(current_buf) {
-      std::swap(srcbuf, dstbuf);
+    if constexpr(doublebuffer) {
+      StorageT *srcbuf = &buf1, *dstbuf = &buf2;
+      if(current_buf) {
+        std::swap(srcbuf, dstbuf);
+      }
+      static_assert(AUT::update_mode == ::update_mode::ALL, "ambiguous update mode");
+      if constexpr(AUT::update_mode == ::update_mode::ALL) {
+        #pragma omp parallel for
+        for(int i = 0; i < w*h; ++i) {
+          dstbuf->buffer[i] = aut.next_state(make_grid<4>([=, this](int y, int x) mutable -> typename StorageT::value_type {
+            return AccessT::access(*srcbuf, y, x) / color_per_state;
+          }, w, h), i / w, i % w) * color_per_state;
+        }
+      }
+    } else {
+      StorageT *srcbuf = &buf1, *dstbuf = &buf1;
+      if constexpr(AUT::update_mode == ::update_mode::CURSOR) {
+        int num_updates = std::sqrt(w * h);
+        //int num_updates = 1;
+        for(int i = 0; i < num_updates; ++i) {
+          auto [index, val] = aut.next_state(make_grid<4>([=, this](int y, int x) mutable -> typename StorageT::value_type {
+            return AccessT::access(*srcbuf, y, x) / color_per_state;
+          }, w, h));
+          dstbuf->buffer[index] = val * color_per_state;
+        }
+      }
     }
-    #pragma omp parallel for
-    for(int i = 0; i < w*h; ++i) {
-      dstbuf.data[i] = AUT::next_state(make_grid<4>([=](int y, int x) mutable -> typename StorageT::value_type {
-        return AccessT::access(srcbuf, y, x) / color_per_state;
-      }, w, h), i / w, i % w) * color_per_state;
+    if constexpr(doublebuffer) {
+      current_buf = current_buf ? 0 : 1;
     }
-    current_buf = current_buf ? 0 : 1;
     reinit_texture();
   }
 
   void reinit_texture() {
-    StorageT srcbuf = !current_buf ? buf1 : buf2;
+    const StorageT *srcbuf = !current_buf ? &buf1 : &buf2;
     if(extrabuf) {
       int per_x = w / tw;
       int per_y = h / th;
@@ -104,16 +132,16 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
         int q = 0;
         for(int iy = 0; iy < per_y; ++iy) {
           for(int ix = 0; ix < per_x; ++ix) {
-            sum += srcbuf.data[(i / tw * per_y + iy) * w + (i % tw) * per_x + ix];
+            sum += srcbuf->buffer[(i / tw * per_y + iy) * w + (i % tw) * per_x + ix];
             ++q;
           }
         }
-        finalbuf.data[i] = uint8_t(sum / q);
+        finalbuf.buffer[i] = uint8_t(sum / q);
       }
-      srcbuf = finalbuf;
+      srcbuf = &finalbuf;
     }
     gl::Texture<GL_TEXTURE_2D>::bind(tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, srcbuf.data); GLERROR
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, srcbuf->data()); GLERROR
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -136,8 +164,16 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
     gl::Texture<GL_TEXTURE_2D>::bind(tex);
   }
 
+  template <typename ShaderProgramT>
+  void init_uniforms(const ShaderProgramT &prog) {
+    uSampler.set_id(prog.id());
+    uNstates.set_id(prog.id());
+    uNstates.set_data(AUT::no_states);
+  }
+
   void set_data(int index) {
     uSampler.set_data(index);
+    uNstates.set_data(AUT::no_states);
   }
 
   static void unbind_texture() {
