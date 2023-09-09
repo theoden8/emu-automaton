@@ -61,31 +61,55 @@ int main(int argc, char *argv[]) {
       case InterfaceApp::AutomataType::CELLULAR:
       switch(iface.autOption) {
         // 2 states
-        case InterfaceApp::Cellular::REPLICATOR:  app.run(cellular::Replicator() , factor);break;
-        case InterfaceApp::Cellular::FREDKIN:     app.run(cellular::Fredkin()    , factor);break;
-        case InterfaceApp::Cellular::SEEDS:       app.run(cellular::Seeds()      , factor);break;
-        case InterfaceApp::Cellular::LIVEORDIE:   app.run(cellular::LiveOrDie()  , factor);break;
-        case InterfaceApp::Cellular::FLOCK:       app.run(cellular::Flock()      , factor);break;
-        case InterfaceApp::Cellular::MAZECTRIC:   app.run(cellular::Mazectric()  , factor);break;
-        case InterfaceApp::Cellular::MAZE:        app.run(cellular::Maze()       , factor);break;
-        case InterfaceApp::Cellular::GAMEOFLIFE:  app.run(cellular::GameOfLife() , factor);break;
-        case InterfaceApp::Cellular::EIGHTLIFE:   app.run(cellular::EightLife()  , factor);break;
-        case InterfaceApp::Cellular::LONGLIFE:    app.run(cellular::LongLife()   , factor);break;
-        case InterfaceApp::Cellular::TXT:         app.run(cellular::TxT()        , factor);break;
-        case InterfaceApp::Cellular::HIGHLIFE:    app.run(cellular::HighLife()   , factor);break;
-        case InterfaceApp::Cellular::MOVE:        app.run(cellular::Move()       , factor);break;
-        case InterfaceApp::Cellular::STAINS:      app.run(cellular::Stains()     , factor);break;
-        case InterfaceApp::Cellular::DAYANDNIGHT: app.run(cellular::DayAndNight(), factor);break;
-        case InterfaceApp::Cellular::ANNEAL:      app.run(cellular::Anneal()     , factor);break;
-        case InterfaceApp::Cellular::DRYLIFE:     app.run(cellular::DryLife()    , factor);break;
-        case InterfaceApp::Cellular::PEDESTRLIFE: app.run(cellular::PedestrLife(), factor);break;
-        case InterfaceApp::Cellular::AMOEBA:      app.run(cellular::Amoeba()     , factor);break;
-        case InterfaceApp::Cellular::DIAMOEBA:    app.run(cellular::Diamoeba()   , factor);break;
-        case InterfaceApp::Cellular::LANGTONSANT: app.run(cellular::LangtonsAnt(), factor);break;
+        case InterfaceApp::Cellular::REPLICATOR:    app.run(cellular::Replicator()   ,factor);break;
+        case InterfaceApp::Cellular::FREDKIN:       app.run(cellular::Fredkin()      ,factor);break;
+        case InterfaceApp::Cellular::SEEDS:         app.run(cellular::Seeds()        ,factor);break;
+        case InterfaceApp::Cellular::LIVEORDIE:     app.run(cellular::LiveOrDie()    ,factor);break;
+        case InterfaceApp::Cellular::FLOCK:         app.run(cellular::Flock()        ,factor);break;
+        case InterfaceApp::Cellular::MAZECTRIC:     app.run(cellular::Mazectric()    ,factor);break;
+        case InterfaceApp::Cellular::MAZE:          app.run(cellular::Maze()         ,factor);break;
+        case InterfaceApp::Cellular::MAZECTRICMICE :app.run(cellular::MazectricMice(),factor);break;
+        case InterfaceApp::Cellular::MAZEMICE:      app.run(cellular::MazeMice()     ,factor);break;
+        case InterfaceApp::Cellular::GAMEOFLIFE:    app.run(cellular::GameOfLife()   ,factor);break;
+        case InterfaceApp::Cellular::EIGHTLIFE:     app.run(cellular::EightLife()    ,factor);break;
+        case InterfaceApp::Cellular::LONGLIFE:      app.run(cellular::LongLife()     ,factor);break;
+        case InterfaceApp::Cellular::TXT:           app.run(cellular::TxT()          ,factor);break;
+        case InterfaceApp::Cellular::HIGHLIFE:      app.run(cellular::HighLife()     ,factor);break;
+        case InterfaceApp::Cellular::MOVE:          app.run(cellular::Move()         ,factor);break;
+        case InterfaceApp::Cellular::STAINS:        app.run(cellular::Stains()       ,factor);break;
+        case InterfaceApp::Cellular::DAYANDNIGHT:   app.run(cellular::DayAndNight()  ,factor);break;
+        case InterfaceApp::Cellular::ANNEAL:        app.run(cellular::Anneal()       ,factor);break;
+        case InterfaceApp::Cellular::DRYLIFE:       app.run(cellular::DryLife()      ,factor);break;
+        case InterfaceApp::Cellular::PEDESTRLIFE:   app.run(cellular::PedestrLife()  ,factor);break;
+        case InterfaceApp::Cellular::AMOEBA:        app.run(cellular::Amoeba()       ,factor);break;
+        case InterfaceApp::Cellular::DIAMOEBA:      app.run(cellular::Diamoeba()     ,factor);break;
+        case InterfaceApp::Cellular::LANGTONSANT:   app.run(cellular::LangtonsAnt()  ,factor);break;
         // 3 states
-        case InterfaceApp::Cellular::BRIANSBRAIN: app.run(cellular::BriansBrain(), factor);break;
+        case InterfaceApp::Cellular::BRIANSBRAIN:   app.run(cellular::BriansBrain()  ,factor);break;
+        case InterfaceApp::Cellular::BRAIN6:        app.run(cellular::Brain6()       ,factor);break;
+        case InterfaceApp::Cellular::FROGS:         app.run(cellular::Frogs()        ,factor);break;
+        case InterfaceApp::Cellular::LINES:         app.run(cellular::Lines()        ,factor);break;
         // 4 states
-        case InterfaceApp::Cellular::WIREWORLD:   app.run(cellular::Wireworld()  , factor);break;
+        case InterfaceApp::Cellular::CATERPILLARS:  app.run(cellular::Caterpillars() ,factor);break;
+        case InterfaceApp::Cellular::ORTHOGO:       app.run(cellular::OrthoGo()      ,factor);break;
+        case InterfaceApp::Cellular::SEDIMENTAL:    app.run(cellular::SediMental()   ,factor);break;
+        case InterfaceApp::Cellular::STARWARS:      app.run(cellular::StarWars()     ,factor);break;
+        case InterfaceApp::Cellular::WIREWORLD:     app.run(cellular::Wireworld()    ,factor);break;
+        // 5 states
+        case InterfaceApp::Cellular::BANNERS:       app.run(cellular::Banners()      ,factor);break;
+        case InterfaceApp::Cellular::GLISSERGY:     app.run(cellular::Glissergy()    ,factor);break;
+        case InterfaceApp::Cellular::SPIRALS:       app.run(cellular::Spirals()      ,factor);break;
+        case InterfaceApp::Cellular::TRANSERS:      app.run(cellular::Transers()     ,factor);break;
+        case InterfaceApp::Cellular::WANDERERS:     app.run(cellular::Wanderers()    ,factor);break;
+        // 6 states
+        case InterfaceApp::Cellular::FROZENSPIRALS: app.run(cellular::FrozenSpirals(),factor);break;
+        case InterfaceApp::Cellular::LIVEONTHEEDGE: app.run(cellular::LiveOnTheEdge(),factor);break;
+        case InterfaceApp::Cellular::PRAIRIEONFIRE: app.run(cellular::PrairieOnFire(),factor);break;
+        case InterfaceApp::Cellular::RAKE:          app.run(cellular::Rake()         ,factor);break;
+        case InterfaceApp::Cellular::SNAKE:         app.run(cellular::Snake()        ,factor);break;
+        case InterfaceApp::Cellular::SOFTFREEZE:    app.run(cellular::SoftFreeze()   ,factor);break;
+        case InterfaceApp::Cellular::STICKS:        app.run(cellular::Sticks()       ,factor);break;
+        case InterfaceApp::Cellular::WORMS:         app.run(cellular::Worms()        ,factor);break;
       }
       case InterfaceApp::AutomataType::PROBABILISTIC:
       switch (iface.autOption) {

@@ -17,27 +17,25 @@ void main(void) {
     if(no_states == 2) {
       float val = float(state);
       frag_color = vec4(val, val, val, 1.0);
-    } else if(no_states == 3) {
-      if(state == 0) {
-        frag_color = vec4(0.0, 0.0, 0.0, 1.0);
-      } else if(state == 1) {
-        frag_color = vec4(0.7, 0.0, 0.7, 1.0);
-      } else if(state == 2) {
-        frag_color = vec4(1.0, 1.0, 1.0, 1.0);
-      }
     } else {
       if(state == 0) {
         frag_color = vec4(0.0, 0.0, 0.0, 1.0);
-      } else if(state == 1) {
-        frag_color = vec4(0.7, 0.7, 0.0, 1.0);
-      } else if(state == 2) {
-        frag_color = vec4(0.0, 0.7, 0.7, 1.0);
-      } else if(state == 3) {
+      } else if(state == no_states - 1) {
         frag_color = vec4(1.0, 1.0, 1.0, 1.0);
+      } else if(state == 1) {
+        frag_color = vec4(0.0, 0.7, 0.7, 1.0);
+      } else if(state == 2) {
+        frag_color = vec4(0.7, 0.7, 0.0, 1.0);
+      } else if(state == 3) {
+        frag_color = vec4(0.7, 0.0, 0.7, 1.0);
       } else if(state == 4) {
         frag_color = vec4(0.0, 0.0, 1.0, 1.0);
-      } else {
+      } else if(state == 5) {
+        frag_color = vec4(0.0, 1.0, 0.0, 1.0);
+      } else if(state == 6) {
         frag_color = vec4(1.0, 0.0, 0.0, 1.0);
+      } else {
+        frag_color = vec4(0.5, 0.5, 0.5, 1.0);
       }
     }
   }

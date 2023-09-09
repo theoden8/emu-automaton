@@ -14,15 +14,13 @@ inline uint8_t random(int y, int x) {
   return rand() % CA::no_states;
 }
 
-constexpr int DEAD = 0, LIVE = 1;
-
 template <typename CA, typename BufT>
-inline int count_moore_neighborhood(BufT &prev, int y, int x) {
+inline int count_moore_neighborhood(BufT &prev, int y, int x, int on_state) {
   int counter = 0;
   for(int iy : {-1, 0, 1}) {
     for(int ix : {-1, 0, 1}) {
       if(!iy&&!ix)continue;
-      if(prev[y + iy][x + ix] == LIVE) {
+      if(prev[y + iy][x + ix] == on_state) {
         ++counter;
       }
     }
@@ -30,7 +28,7 @@ inline int count_moore_neighborhood(BufT &prev, int y, int x) {
   return counter;
 }
 
-template <class B, class S> struct BS;
+template <class B, class S, size_t C> struct BSC;
 
 template <int... Cs> struct one_of_cond;
 template <int C, int... Cs> struct one_of_cond<C, Cs...> {
@@ -40,28 +38,50 @@ template <> struct one_of_cond<> {
   static inline bool eval(int){return false;}
 };
 
-template <int... Bs, int... Ss>
-struct BS<std::index_sequence<Bs...>, std::index_sequence<Ss...>> {
-  using self_t = BS<std::index_sequence<Bs...>, std::index_sequence<Ss...>>;
+// https://conwaylife.com/wiki/List_of_Generations_rules
+template <int... Bs, int... Ss, size_t C>
+struct BSC<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C> {
+  using self_t = BSC<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C>;
   static constexpr int outside_state = 0;
-  static constexpr int no_states = 2;
+  static constexpr int no_states = C;
   static constexpr int dim = 4;
   static constexpr int update_mode = ::update_mode::ALL;
   static inline uint8_t init_state(int y, int x) {
     return random<self_t>(y, x);
   }
 
+  static constexpr int DEAD = 0, LIVE = self_t::no_states - 1;
+
+  // 0 dead
+  // N - 1 alive
+  // N - 2 age 1
+  // N - 3 age 2
+  // ...
+
   template <typename B>
   static inline uint8_t next_state(B &&prev, int y, int x) {
-    int count = count_moore_neighborhood<self_t>(prev, y, x);
-    if(prev[y][x] == DEAD && one_of_cond<Bs...>::eval(count)/* || (rand() % 100 == 99 && count > 1)*/) {
-      return LIVE;
-    } else if(prev[y][x] == LIVE && one_of_cond<Ss...>::eval(count)) {
-      return LIVE;
+    const int count = count_moore_neighborhood<self_t>(prev, y, x, LIVE);
+    const int state = prev[y][x];
+    switch(state) {
+      case DEAD:
+        if(one_of_cond<Bs...>::eval(count)/* || (rand() % 100 == 99 && count > 1)*/) {
+          return LIVE;
+        }
+      break;
+      case LIVE:
+        if(one_of_cond<Ss...>::eval(count)) {
+          return LIVE;
+        }
+        // no break
+      default:
+        return state - 1;
+      break;
     }
     return DEAD;
   }
 };
+
+template <class B, class S> using BS = BSC<B, S, 2>;
 
 struct LangtonsAnt {
   using self_t = LangtonsAnt;
@@ -69,6 +89,8 @@ struct LangtonsAnt {
   static constexpr int no_states = 2;
   static constexpr int dim = 4;
   static constexpr int update_mode = ::update_mode::CURSOR;
+
+  static constexpr int DEAD = 0, LIVE = 1;
 
   enum direction : int {
     LEFT, UP, RIGHT, DOWN, NO_DIRS
@@ -135,49 +157,6 @@ struct LangtonsAnt {
   }
 };
 
-struct BriansBrain {
-  using self_t = BriansBrain;
-  static constexpr int outside_state = 0;
-  static constexpr int no_states = 3;
-  static constexpr int dim = 4;
-  static constexpr int update_mode = ::update_mode::ALL;
-
-  static constexpr int DEAD = 0, DYING = 1, LIVE = 2;
-
-  static inline uint8_t init_state(int y, int x) {
-    return random<self_t>(y, x);
-  }
-
-  template <typename B>
-  static int count_moore_neighborhood_live(B &prev, int y, int x) {
-    int count = 0;
-    for(int ix = -1; ix <= 1; ++ix) {
-      for(int iy = -1; iy <= 1; ++iy) {
-        if(!ix&&!iy)continue;
-        if(prev[y+iy][x+ix]==LIVE)++count;
-      }
-    }
-    return count;
-  }
-
-  template <typename B>
-  static inline uint8_t next_state(B &&prev, int y, int x) {
-    const int state = prev[y][x];
-    if(state == DEAD) {
-      const int count_on = count_moore_neighborhood_live(prev, y, x);
-      if(count_on == 2) {
-        return LIVE;
-      }
-      return DEAD;
-    } else if(state == LIVE) {
-      return DYING;
-    } else if(state == DYING) {
-      return DEAD;
-    }
-    return DEAD;
-  }
-};
-
 struct Wireworld {
   using self_t = Wireworld;
   static constexpr int outside_state = 0;
@@ -225,34 +204,61 @@ namespace cellular {
   template <size_t... Is> using sequence = std::index_sequence<Is...>;
 
   // 2 states
-  using Replicator  =  ca::BS<sequence<1,3,5,7>,   sequence<1,3,5,7>>;
-  using Fredkin     =  ca::BS<sequence<1,3,5,7>,   sequence<0,2,4,6,8>>;
-  using Seeds       =  ca::BS<sequence<2>,         sequence<>>;
-  using LiveOrDie   =  ca::BS<sequence<2>,         sequence<0>>;
+  using Replicator   =  ca::BS<sequence<1,3,5,7>,    sequence<1,3,5,7>>;
+  using Fredkin      =  ca::BS<sequence<1,3,5,7>,    sequence<0,2,4,6,8>>;
+  using Seeds        =  ca::BS<sequence<2>,          sequence<>>;
+  using LiveOrDie    =  ca::BS<sequence<2>,          sequence<0>>;
 
-  using Flock       =  ca::BS<sequence<3>,         sequence<1,2>>;
-  using Mazectric   =  ca::BS<sequence<3>,         sequence<1,2,3,4>>;
-  using Maze        =  ca::BS<sequence<3>,         sequence<1,2,3,4,5>>;
-  using GameOfLife  =  ca::BS<sequence<3>,         sequence<2,3>>;
-  using EightLife   =  ca::BS<sequence<3>,         sequence<2,3,8>>;
-  using LongLife    =  ca::BS<sequence<3,4,5>,     sequence<5>>;
-  using TxT         =  ca::BS<sequence<3,6>,       sequence<1,2,5>>;
-  using HighLife    =  ca::BS<sequence<3,6>,       sequence<2,3>>;
-  using Move        =  ca::BS<sequence<3,6,8>,     sequence<2,4,5>>;
-  using Stains      =  ca::BS<sequence<3,6,7,8>,   sequence<2,3,5,6,7,8>>;
-  using DayAndNight =  ca::BS<sequence<3,6,7,8>,   sequence<3,4,6,7,8>>;
-  using Anneal      =  ca::BS<sequence<4,6,7,8>,   sequence<3,5,6,7,8>>;
-  using DryLife     =  ca::BS<sequence<3,7>,       sequence<2,3>>;
-  using PedestrLife =  ca::BS<sequence<3,8>,       sequence<2,3>>;
+  using Flock        =  ca::BS<sequence<3>,          sequence<1,2>>;
+  using Mazectric    =  ca::BS<sequence<3>,          sequence<1,2,3,4>>;
+  using Maze         =  ca::BS<sequence<3>,          sequence<1,2,3,4,5>>;
+  using MazectricMice=  ca::BS<sequence<3,7>,        sequence<1,2,3,4>>;
+  using MazeMice     =  ca::BS<sequence<3,7>,        sequence<1,2,3,4,5>>;
+  using GameOfLife   =  ca::BS<sequence<3>,          sequence<2,3>>;
+  using EightLife    =  ca::BS<sequence<3>,          sequence<2,3,8>>;
+  using LongLife     =  ca::BS<sequence<3,4,5>,      sequence<5>>;
+  using TxT          =  ca::BS<sequence<3,6>,        sequence<1,2,5>>;
+  using HighLife     =  ca::BS<sequence<3,6>,        sequence<2,3>>;
+  using Move         =  ca::BS<sequence<3,6,8>,      sequence<2,4,5>>;
+  using Stains       =  ca::BS<sequence<3,6,7,8>,    sequence<2,3,5,6,7,8>>;
+  using DayAndNight  =  ca::BS<sequence<3,6,7,8>,    sequence<3,4,6,7,8>>;
+  using Anneal       =  ca::BS<sequence<4,6,7,8>,    sequence<3,5,6,7,8>>;
+  using DryLife      =  ca::BS<sequence<3,7>,        sequence<2,3>>;
+  using PedestrLife  =  ca::BS<sequence<3,8>,        sequence<2,3>>;
 
-  using Amoeba      =  ca::BS<sequence<3,5,7>,     sequence<1,3,5,8>>;
-  using Diamoeba    =  ca::BS<sequence<3,5,6,7,8>, sequence<5,6,7,8>>;
+  using Amoeba       =  ca::BS<sequence<3,5,7>,      sequence<1,3,5,8>>;
+  using Diamoeba     =  ca::BS<sequence<3,5,6,7,8>,  sequence<5,6,7,8>>;
 
-  using LangtonsAnt = ca::LangtonsAnt;
+  using LangtonsAnt  = ca::LangtonsAnt;
 
   // 3 states
-  using BriansBrain = ca::BriansBrain;
+  using BriansBrain  = ca::BSC<sequence<2>,          sequence<>,            3>;
+  using Brain6       = ca::BSC<sequence<2,4,6>,      sequence<6>,           3>;
+  using Frogs        = ca::BSC<sequence<3,4>,        sequence<1,2>,         3>;
+  using Lines        = ca::BSC<sequence<4,5,8>,      sequence<0,1,2,3,4,5>, 3>;
 
   // 4 states
-  using Wireworld = ca::Wireworld;
+  using Caterpillars = ca::BSC<sequence<3,7,8>,      sequence<1,2,4,5,6,7>,  4>;
+  using OrthoGo      = ca::BSC<sequence<2>,          sequence<3>,            4>;
+  using SediMental   = ca::BSC<sequence<2,5,6,7,8>,  sequence<4,5,6,7,8>,    4>;
+  using StarWars     = ca::BSC<sequence<2>,          sequence<3,4,5>,        4>;
+
+  using Wireworld    = ca::Wireworld;
+
+  // 5 states
+  using Banners      = ca::BSC<sequence<3,4,5,7>,    sequence<2,3,6,7>,      5>;
+  using Glissergy    = ca::BSC<sequence<2,4,5,6,7,8>,sequence<0,3,5,6,7,8>,  5>;
+  using Spirals      = ca::BSC<sequence<2,3,4>,      sequence<2>,            5>;
+  using Transers     = ca::BSC<sequence<2,6>,        sequence<3,4,5>,        5>;
+  using Wanderers    = ca::BSC<sequence<3,4,6,7,8>,  sequence<3,4,5>,        5>;
+
+  // 6 states
+  using FrozenSpirals= ca::BSC<sequence<2,3>,       sequence<3,5,6>,        6>;
+  using LiveOnTheEdge= ca::BSC<sequence<3>,         sequence<3,4,5>,        6>;
+  using PrairieOnFire= ca::BSC<sequence<3,4>,       sequence<3,4,5>,        6>;
+  using Rake         = ca::BSC<sequence<2,6,7,8>,   sequence<3,4,6,7>,      6>;
+  using Snake        = ca::BSC<sequence<2,5>,       sequence<0,3,4,6,7>,    6>;
+  using SoftFreeze   = ca::BSC<sequence<3,8>,       sequence<1,3,4,5,8>,    6>;
+  using Sticks       = ca::BSC<sequence<2>,         sequence<3,4,5,6>,      6>;
+  using Worms        = ca::BSC<sequence<2,5>,       sequence<3,4,6,7>,      6>;
 } // namespace cellular
