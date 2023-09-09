@@ -9,12 +9,12 @@
 #include <random>
 
 
-template <typename CA>
-inline uint8_t random(int y, int x) {
-  return rand() % CA::no_states;
-}
+namespace sca {
 
-constexpr int DEAD = 0, LIVE = 1;
+template <typename SCA>
+inline uint8_t random(int y, int x) {
+  return rand() % SCA::no_states;
+}
 
 struct ising_model {
   using self_t = ising_model;
@@ -22,6 +22,8 @@ struct ising_model {
   static constexpr int no_states = 2;
   static constexpr int dim = 4;
   static constexpr int update_mode = ::update_mode::CURSOR;
+
+  static constexpr int DEAD = 0, LIVE = 1;
 
   float beta, h;
   std::random_device rd;
@@ -59,6 +61,8 @@ struct ising_model {
   }
 };
 
+} // namespace sca
+
 namespace probabilistic {
-  using Ising = ising_model;
+  using Ising = sca::ising_model;
 } // namespace probabilistic

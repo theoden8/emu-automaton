@@ -8,6 +8,8 @@ namespace {
 
 #include <Linear.hpp>
 #include <Cellular.hpp>
+#include <Probabilistic.hpp>
+
 
 // grid: a macro-topology of the automaton.
 // takes a function, which can read and/or write to it

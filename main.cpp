@@ -10,7 +10,6 @@
 #include <Window.hpp>
 #include <InterfaceApp.hpp>
 #include <AutomatonApp.hpp>
-#include <Ising.hpp>
 
 #if !defined(_POSIX_VERSION)
 #include <direct.h>
