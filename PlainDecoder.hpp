@@ -1,6 +1,8 @@
 #pragma once
 
+#ifndef __APPLE__
 #include <omp.h>
+#endif
 
 #include <Filestream.hpp>
 #include <Automaton.hpp>

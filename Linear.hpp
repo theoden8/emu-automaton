@@ -6,6 +6,7 @@
 #include <utility>
 
 namespace la {
+
 template <typename LA>
 inline uint8_t random(int y, int x) {
   return rand() % LA::no_states;
@@ -27,8 +28,9 @@ inline uint64_t get_case(B &prev, int y, int x) {
   return result;
 }
 
-template <int N, uint64_t C> struct Rule {
-  using this_t = Rule<N, C>;
+template <size_t N>
+struct Rule {
+  using self_t = Rule;
   static constexpr int outside_state = 0;
   static constexpr int no_states = 2;
   static constexpr int no_neighbours = N;
@@ -43,27 +45,39 @@ template <int N, uint64_t C> struct Rule {
     /*   return DEAD; */
     /* } */
     if(y == 0) {
-      return random<this_t>(y, x);
+      return random<self_t>(y, x);
     }
     return outside_state;
   }
+
+  uint64_t c;
+  inline explicit Rule(uint64_t c):
+    c(c)
+  {}
+
   template <typename B>
-  static inline uint8_t next_state(B &&prev, int y, int x) {
+  inline uint8_t next_state(B &&prev, int y, int x) {
     if(y > 0) {
       return prev[y - 1][x];
     }
-    if(C & (uint64_t(1) << get_case<this_t>(prev, 0, x))) {
+    if(c & (uint64_t(1) << get_case<self_t>(prev, 0, x))) {
       return LIVE;
     }
     return DEAD;
   }
 };
+
+template <int N, uint64_t C>
+decltype(auto) rule() {
+  return Rule<N>(C);
+}
+
 } // namespace la
 
 namespace linear {
-  using Rule30 = la::Rule<3, 30LLU>;
-  using Rule54 = la::Rule<3, 54LLU>;
-  using Rule90 = la::Rule<3, 90LLU>;
-  using Rule110 = la::Rule<3, 110LLU>;
-  using Rule184 = la::Rule<3, 184LLU>;
+  constexpr auto Rule30  = la::rule<3, 30LLU>;
+  constexpr auto Rule54  = la::rule<3, 54LLU>;
+  constexpr auto Rule90  = la::rule<3, 90LLU>;
+  constexpr auto Rule110 = la::rule<3, 110LLU>;
+  constexpr auto Rule184 = la::rule<3, 184LLU>;
 } // namespace linear

@@ -17,7 +17,7 @@ void main(void) {
     if(no_states == 2) {
       float val = float(state);
       frag_color = vec4(val, val, val, 1.0);
-    } else {
+    } else if(no_states <= 7) {
       if(state == 0) {
         frag_color = vec4(0.0, 0.0, 0.0, 1.0);
       } else if(state == no_states - 1) {
@@ -34,9 +34,10 @@ void main(void) {
         frag_color = vec4(0.0, 1.0, 0.0, 1.0);
       } else if(state == 6) {
         frag_color = vec4(1.0, 0.0, 0.0, 1.0);
-      } else {
-        frag_color = vec4(0.5, 0.5, 0.5, 1.0);
       }
+    } else {
+      float val = float(state) / float(no_states - 1);
+      frag_color = vec4(val, val, val, 1.0);
     }
   }
 }

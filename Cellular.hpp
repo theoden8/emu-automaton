@@ -3,8 +3,11 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+#include <vector>
+#include <initializer_list>
 #include <type_traits>
 #include <utility>
+#include <bitset>
 #include <iostream>
 
 namespace ca {
@@ -28,20 +31,11 @@ inline int count_moore_neighborhood(BufT &prev, int y, int x, int on_state) {
   return counter;
 }
 
-template <class B, class S, size_t C> struct BSC;
-
-template <int... Cs> struct one_of_cond;
-template <int C, int... Cs> struct one_of_cond<C, Cs...> {
-  static inline bool eval(int val) { return C == val || one_of_cond<Cs...>::eval(val); }
-};
-template <> struct one_of_cond<> {
-  static inline bool eval(int){return false;}
-};
-
 // https://conwaylife.com/wiki/List_of_Generations_rules
-template <int... Bs, int... Ss, size_t C>
-struct BSC<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C> {
-  using self_t = BSC<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C>;
+// http://www.mirekw.com/ca/rullex_gene.html
+template <size_t C>
+struct BSC {
+  using self_t = BSC<C>;
   static constexpr int outside_state = 0;
   static constexpr int no_states = C;
   static constexpr int dim = 4;
@@ -50,7 +44,20 @@ struct BSC<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C> {
     return random<self_t>(y, x);
   }
 
+  std::bitset<8> bs_bitmask, ss_bitmask;
+
   static constexpr int DEAD = 0, LIVE = self_t::no_states - 1;
+
+  inline explicit BSC(std::initializer_list<uint8_t> bs, std::initializer_list<uint8_t> ss):
+    bs_bitmask(0), ss_bitmask(0)
+  {
+    for(uint8_t b : bs) {
+      bs_bitmask[b] = 1;
+    }
+    for(uint8_t s : ss) {
+      ss_bitmask[s] = 1;
+    }
+  }
 
   // 0 dead
   // N - 1 alive
@@ -59,17 +66,17 @@ struct BSC<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C> {
   // ...
 
   template <typename B>
-  static inline uint8_t next_state(B &&prev, int y, int x) {
+  inline uint8_t next_state(B &&prev, int y, int x) {
     const int count = count_moore_neighborhood<self_t>(prev, y, x, LIVE);
     const int state = prev[y][x];
     switch(state) {
       case DEAD:
-        if(one_of_cond<Bs...>::eval(count)/* || (rand() % 100 == 99 && count > 1)*/) {
+        if(bs_bitmask[count]) {
           return LIVE;
         }
       break;
       case LIVE:
-        if(one_of_cond<Ss...>::eval(count)) {
+        if(ss_bitmask[count]) {
           return LIVE;
         }
         // no break
@@ -81,7 +88,16 @@ struct BSC<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C> {
   }
 };
 
-template <class B, class S> using BS = BSC<B, S, 2>;
+template <class B, class S, size_t C> struct bsc_constructor;
+template <size_t... Bs, size_t... Ss, size_t C>
+struct bsc_constructor<std::index_sequence<Bs...>, std::index_sequence<Ss...>, C> {
+  inline static decltype(auto) make() {
+    return BSC<C>({Bs...}, {Ss...});
+  }
+};
+
+template <class B, class S, size_t C> constexpr auto bsc = bsc_constructor<B, S, C>::make;
+template <class B, class S> constexpr auto bs = bsc<B, S, 2>;
 
 struct LangtonsAnt {
   using self_t = LangtonsAnt;
@@ -204,61 +220,99 @@ namespace cellular {
   template <size_t... Is> using sequence = std::index_sequence<Is...>;
 
   // 2 states
-  using Replicator   =  ca::BS<sequence<1,3,5,7>,    sequence<1,3,5,7>>;
-  using Fredkin      =  ca::BS<sequence<1,3,5,7>,    sequence<0,2,4,6,8>>;
-  using Seeds        =  ca::BS<sequence<2>,          sequence<>>;
-  using LiveOrDie    =  ca::BS<sequence<2>,          sequence<0>>;
+  constexpr auto Replicator     =  ca::bs<sequence<1,3,5,7>,    sequence<1,3,5,7>>;
+  constexpr auto Fredkin        =  ca::bs<sequence<1,3,5,7>,    sequence<0,2,4,6,8>>;
+  constexpr auto Seeds          =  ca::bs<sequence<2>,          sequence<>>;
+  constexpr auto LiveOrDie      =  ca::bs<sequence<2>,          sequence<0>>;
 
-  using Flock        =  ca::BS<sequence<3>,          sequence<1,2>>;
-  using Mazectric    =  ca::BS<sequence<3>,          sequence<1,2,3,4>>;
-  using Maze         =  ca::BS<sequence<3>,          sequence<1,2,3,4,5>>;
-  using MazectricMice=  ca::BS<sequence<3,7>,        sequence<1,2,3,4>>;
-  using MazeMice     =  ca::BS<sequence<3,7>,        sequence<1,2,3,4,5>>;
-  using GameOfLife   =  ca::BS<sequence<3>,          sequence<2,3>>;
-  using EightLife    =  ca::BS<sequence<3>,          sequence<2,3,8>>;
-  using LongLife     =  ca::BS<sequence<3,4,5>,      sequence<5>>;
-  using TxT          =  ca::BS<sequence<3,6>,        sequence<1,2,5>>;
-  using HighLife     =  ca::BS<sequence<3,6>,        sequence<2,3>>;
-  using Move         =  ca::BS<sequence<3,6,8>,      sequence<2,4,5>>;
-  using Stains       =  ca::BS<sequence<3,6,7,8>,    sequence<2,3,5,6,7,8>>;
-  using DayAndNight  =  ca::BS<sequence<3,6,7,8>,    sequence<3,4,6,7,8>>;
-  using Anneal       =  ca::BS<sequence<4,6,7,8>,    sequence<3,5,6,7,8>>;
-  using DryLife      =  ca::BS<sequence<3,7>,        sequence<2,3>>;
-  using PedestrLife  =  ca::BS<sequence<3,8>,        sequence<2,3>>;
+  constexpr auto Flock          =  ca::bs<sequence<3>,          sequence<1,2>>;
+  constexpr auto Mazectric      =  ca::bs<sequence<3>,          sequence<1,2,3,4>>;
+  constexpr auto Maze           =  ca::bs<sequence<3>,          sequence<1,2,3,4,5>>;
+  constexpr auto MazectricMice  =  ca::bs<sequence<3,7>,        sequence<1,2,3,4>>;
+  constexpr auto MazeMice       =  ca::bs<sequence<3,7>,        sequence<1,2,3,4,5>>;
+  constexpr auto GameOfLife     =  ca::bs<sequence<3>,          sequence<2,3>>;
+  constexpr auto EightLife      =  ca::bs<sequence<3>,          sequence<2,3,8>>;
+  constexpr auto LongLife       =  ca::bs<sequence<3,4,5>,      sequence<5>>;
+  constexpr auto TxT            =  ca::bs<sequence<3,6>,        sequence<1,2,5>>;
+  constexpr auto HighLife       =  ca::bs<sequence<3,6>,        sequence<2,3>>;
+  constexpr auto Move           =  ca::bs<sequence<3,6,8>,      sequence<2,4,5>>;
+  constexpr auto Stains         =  ca::bs<sequence<3,6,7,8>,    sequence<2,3,5,6,7,8>>;
+  constexpr auto DayAndNight    =  ca::bs<sequence<3,6,7,8>,    sequence<3,4,6,7,8>>;
+  constexpr auto Anneal         =  ca::bs<sequence<4,6,7,8>,    sequence<3,5,6,7,8>>;
+  constexpr auto DryLife        =  ca::bs<sequence<3,7>,        sequence<2,3>>;
+  constexpr auto PedestrLife    =  ca::bs<sequence<3,8>,        sequence<2,3>>;
 
-  using Amoeba       =  ca::BS<sequence<3,5,7>,      sequence<1,3,5,8>>;
-  using Diamoeba     =  ca::BS<sequence<3,5,6,7,8>,  sequence<5,6,7,8>>;
+  constexpr auto Amoeba         =  ca::bs<sequence<3,5,7>,      sequence<1,3,5,8>>;
+  constexpr auto Diamoeba       =  ca::bs<sequence<3,5,6,7,8>,  sequence<5,6,7,8>>;
 
   using LangtonsAnt  = ca::LangtonsAnt;
 
   // 3 states
-  using BriansBrain  = ca::BSC<sequence<2>,          sequence<>,            3>;
-  using Brain6       = ca::BSC<sequence<2,4,6>,      sequence<6>,           3>;
-  using Frogs        = ca::BSC<sequence<3,4>,        sequence<1,2>,         3>;
-  using Lines        = ca::BSC<sequence<4,5,8>,      sequence<0,1,2,3,4,5>, 3>;
+  constexpr auto BriansBrain    = ca::bsc<sequence<2>,          sequence<>,             3 >;
+  constexpr auto Brain6         = ca::bsc<sequence<2,4,6>,      sequence<6>,            3 >;
+  constexpr auto Frogs          = ca::bsc<sequence<3,4>,        sequence<1,2>,          3 >;
+  constexpr auto Lines          = ca::bsc<sequence<4,5,8>,      sequence<0,1,2,3,4,5>,  3 >;
 
   // 4 states
-  using Caterpillars = ca::BSC<sequence<3,7,8>,      sequence<1,2,4,5,6,7>,  4>;
-  using OrthoGo      = ca::BSC<sequence<2>,          sequence<3>,            4>;
-  using SediMental   = ca::BSC<sequence<2,5,6,7,8>,  sequence<4,5,6,7,8>,    4>;
-  using StarWars     = ca::BSC<sequence<2>,          sequence<3,4,5>,        4>;
+  constexpr auto Caterpillars   = ca::bsc<sequence<3,7,8>,      sequence<1,2,4,5,6,7>,  4 >;
+  constexpr auto OrthoGo        = ca::bsc<sequence<2>,          sequence<3>,            4 >;
+  constexpr auto SediMental     = ca::bsc<sequence<2,5,6,7,8>,  sequence<4,5,6,7,8>,    4 >;
+  constexpr auto StarWars       = ca::bsc<sequence<2>,          sequence<3,4,5>,        4 >;
 
   using Wireworld    = ca::Wireworld;
 
   // 5 states
-  using Banners      = ca::BSC<sequence<3,4,5,7>,    sequence<2,3,6,7>,      5>;
-  using Glissergy    = ca::BSC<sequence<2,4,5,6,7,8>,sequence<0,3,5,6,7,8>,  5>;
-  using Spirals      = ca::BSC<sequence<2,3,4>,      sequence<2>,            5>;
-  using Transers     = ca::BSC<sequence<2,6>,        sequence<3,4,5>,        5>;
-  using Wanderers    = ca::BSC<sequence<3,4,6,7,8>,  sequence<3,4,5>,        5>;
+  constexpr auto Banners        = ca::bsc<sequence<3,4,5,7>,    sequence<2,3,6,7>,      5 >;
+  constexpr auto Glissergy      = ca::bsc<sequence<2,4,5,6,7,8>,sequence<0,3,5,6,7,8>,  5 >;
+  constexpr auto Spirals        = ca::bsc<sequence<2,3,4>,      sequence<2>,            5 >;
+  constexpr auto Transers       = ca::bsc<sequence<2,6>,        sequence<3,4,5>,        5 >;
+  constexpr auto Wanderers      = ca::bsc<sequence<3,4,6,7,8>,  sequence<3,4,5>,        5 >;
 
   // 6 states
-  using FrozenSpirals= ca::BSC<sequence<2,3>,       sequence<3,5,6>,        6>;
-  using LiveOnTheEdge= ca::BSC<sequence<3>,         sequence<3,4,5>,        6>;
-  using PrairieOnFire= ca::BSC<sequence<3,4>,       sequence<3,4,5>,        6>;
-  using Rake         = ca::BSC<sequence<2,6,7,8>,   sequence<3,4,6,7>,      6>;
-  using Snake        = ca::BSC<sequence<2,5>,       sequence<0,3,4,6,7>,    6>;
-  using SoftFreeze   = ca::BSC<sequence<3,8>,       sequence<1,3,4,5,8>,    6>;
-  using Sticks       = ca::BSC<sequence<2>,         sequence<3,4,5,6>,      6>;
-  using Worms        = ca::BSC<sequence<2,5>,       sequence<3,4,6,7>,      6>;
+  constexpr auto Chenille       = ca::bsc<sequence<2,4,5,6,7>,  sequence<0,5,6,7,8>,    6 >;
+  constexpr auto FrozenSpirals  = ca::bsc<sequence<2,3>,        sequence<3,5,6>,        6 >;
+  constexpr auto LivingOnTheEdge= ca::bsc<sequence<3>,          sequence<3,4,5>,        6 >;
+  constexpr auto PrairieOnFire  = ca::bsc<sequence<3,4>,        sequence<3,4,5>,        6 >;
+  constexpr auto Rake           = ca::bsc<sequence<2,6,7,8>,    sequence<3,4,6,7>,      6 >;
+  constexpr auto Snake          = ca::bsc<sequence<2,5>,        sequence<0,3,4,6,7>,    6 >;
+  constexpr auto SoftFreeze     = ca::bsc<sequence<3,8>,        sequence<1,3,4,5,8>,    6 >;
+  constexpr auto Sticks         = ca::bsc<sequence<2>,          sequence<3,4,5,6>,      6 >;
+  constexpr auto Worms          = ca::bsc<sequence<2,5>,        sequence<3,4,6,7>,      6 >;
+
+  // 7 states
+  constexpr auto Glisserati     = ca::bsc<sequence<2,4,5,6,7,8>,sequence<0,3,5,6,7,8>,  7 >;
+
+  // 8 states
+  constexpr auto BelZhab        = ca::bsc<sequence<2,3>,        sequence<1,4,5,6,7,8>,  8 >;
+  constexpr auto CircuitGenesis = ca::bsc<sequence<1,2,3,4>,    sequence<2,3,4,5>,      8 >;
+  constexpr auto Cooties        = ca::bsc<sequence<2>,          sequence<2,3>,          8 >;
+  constexpr auto FlamingStarbows= ca::bsc<sequence<2,3>,        sequence<3,4,7>,        8 >;
+  constexpr auto Lava           = ca::bsc<sequence<4,5,6,7,8>,  sequence<1,2,3,4,5>,    8 >;
+  constexpr auto MeteorGuns     = ca::bsc<sequence<3>,       sequence<0,1,2,4,5,6,7,8>, 8 >;
+  constexpr auto Swirl          = ca::bsc<sequence<3,4>,        sequence<2,3>,          8 >;
+
+  // 9 states
+  constexpr auto Burst          = ca::bsc<sequence<3,4,6,8>,    sequence<0,2,3,5,6,7,8>,9 >;
+  constexpr auto Burst2         = ca::bsc<sequence<3,4,6,8>,    sequence<2,3,5,6,7,8>,  9 >;
+
+  // 16 states
+  constexpr auto Xtasy          = ca::bsc<sequence<2,3,5,6>,    sequence<1,4,5,6>,      16>;
+
+  // 18 states
+  constexpr auto EbbAndFlow     = ca::bsc<sequence<3,6>,        sequence<0,1,2,4,7,8>,  18>;
+  constexpr auto EbbAndFlow2    = ca::bsc<sequence<3,7>,        sequence<0,1,2,4,6,8>,  18>;
+
+  // 21 states
+  constexpr auto Fireworks      = ca::bsc<sequence<1,3>,        sequence<2>,            21>;
+
+  // 24 states
+  constexpr auto Bloomerang     = ca::bsc<sequence<3,4,6,7,8>,  sequence<2,3,4>,        24>;
+
+  // 25 states
+  constexpr auto Bombers        = ca::bsc<sequence<2,4>,        sequence<3,4,5>,        25>;
+  constexpr auto Nova           = ca::bsc<sequence<2,4,7,8>,    sequence<4,5,6,7,8>,    25>;
+  constexpr auto Faders         = ca::bsc<sequence<2>,          sequence<2>,            25>;
+
+  // 48 states
+  constexpr auto ThrillGrill    = ca::bsc<sequence<3,4>,        sequence<1,2,3,4>,      48>;
 } // namespace cellular

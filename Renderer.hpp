@@ -104,7 +104,7 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
     } else {
       StorageT *srcbuf = &buf1, *dstbuf = &buf1;
       if constexpr(AUT::update_mode == ::update_mode::CURSOR) {
-        int num_updates = std::sqrt(w * h);
+        int num_updates = std::sqrt(w * h) * std::log2(w * h);
         //int num_updates = 1;
         for(int i = 0; i < num_updates; ++i) {
           auto [index, val] = aut.next_state(make_grid<4>([=, this](int y, int x) mutable -> typename StorageT::value_type {
@@ -125,15 +125,14 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
     if(extrabuf) {
       int per_x = w / tw;
       int per_y = h / th;
+      const int q = per_x * per_y;
       #pragma omp parallel for
       for(int i = 0; i < tw*th; ++i) {
         uint32_t sum = 0;
         int y = i / tw, x = i % tw;
-        int q = 0;
         for(int iy = 0; iy < per_y; ++iy) {
           for(int ix = 0; ix < per_x; ++ix) {
             sum += srcbuf->buffer[(i / tw * per_y + iy) * w + (i % tw) * per_x + ix];
-            ++q;
           }
         }
         finalbuf.buffer[i] = uint8_t(sum / q);
