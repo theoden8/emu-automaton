@@ -69,22 +69,14 @@ struct BSC {
   inline uint8_t next_state(B &&prev, int y, int x) {
     const int count = count_moore_neighborhood<self_t>(prev, y, x, LIVE);
     const int state = prev[y][x];
-    switch(state) {
-      case DEAD:
-        if(bs_bitmask[count]) {
-          return LIVE;
-        }
-      break;
-      case LIVE:
-        if(ss_bitmask[count]) {
-          return LIVE;
-        }
-        // no break
-      default:
-        return state - 1;
-      break;
+    if(
+        (state == DEAD && bs_bitmask[count])
+        || (state == LIVE && ss_bitmask[count])
+    )
+    {
+      return LIVE;
     }
-    return DEAD;
+    return (state == 0) ? 0 : state - 1;
   }
 };
 

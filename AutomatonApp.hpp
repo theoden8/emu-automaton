@@ -11,9 +11,13 @@ class AutomatonApp;
 
 namespace {
 
-typedef enum { RUN_TWOSTATE, RUN_THREESTATE } RUNNER_TYPE;
-template <typename AUT> struct use_runner_type {
-  static const RUNNER_TYPE rtype = RUN_TWOSTATE;
+template <typename AUT> struct use_storage_mode {
+  static constexpr storage_mode smode = storage_mode::HOSTBUFFER;
+};
+
+template <size_t C>
+struct use_storage_mode<ca::BSC<C>> {
+  static constexpr storage_mode smode = storage_mode::TEXTURES;
 };
 
 } // namespace
@@ -28,16 +32,32 @@ public:
     dir(dir)
   {}
 
+  template <storage_mode StorageMode, typename AUT>
+  void run_with_storage_mode(AUT &&aut, int factor);
+
   template <typename AUT>
-  void run(AUT aut, int factor);
+  void run(AUT &&aut, int factor) {
+    AutomatonApp &app = (*this);
+    constexpr storage_mode storage_mode_recommended = ::use_storage_mode<AUT>::smode;
+    if constexpr(storage_mode_recommended == storage_mode::HOSTBUFFER) {
+      run_with_storage_mode<storage_mode::HOSTBUFFER>(std::forward<AUT>(aut), factor);
+    } else {
+      if(app.w.gl_support_compute_shaders) {
+        run_with_storage_mode<storage_mode_recommended>(std::forward<AUT>(aut), factor);
+      } else {
+        run_with_storage_mode<storage_mode::HOSTBUFFER>(std::forward<AUT>(aut), factor);
+      }
+    }
+  }
 };
 
-template <typename AUT>
-void AutomatonApp::run(AUT aut, int factor) {
-  constexpr RUNNER_TYPE RunnerType  = ::use_runner_type<AUT>::rtype;
-  AutomatonApp &app = *this;
+template <storage_mode StorageMode, typename AUT>
+void AutomatonApp::run_with_storage_mode(AUT &&aut, int factor) {
+  AutomatonApp &app = (*this);
   app.w.update_size();
-  Renderer<AUT, storage_mode::HostBuffer, access_mode::looped> automaton(aut, "grid"s, "no_states"s);
+  Logger::Info("automaton app\n");
+  Renderer<AUT, StorageMode, access_mode::looped> automaton(aut, app.dir);
+  Logger::Info("using storage mode %s\n", (automaton.get_storage_mode() == storage_mode::HOSTBUFFER) ? "host" : "textures");
   gl::VertexArray vao;
   gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2> attrVertex("vertex"s);
   gl::ShaderProgram<
@@ -88,7 +108,7 @@ void AutomatonApp::run(AUT aut, int factor) {
       ShaderProgram::use(prog);
       automaton.set_active(0);
       automaton.bind_texture();
-      automaton.set_data(0);
+      automaton.set_data_renderer(0);
       gl::VertexArray::bind(vao);
       glDrawArrays(GL_TRIANGLES, 0, 6); GLERROR
       gl::VertexArray::unbind();

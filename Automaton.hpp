@@ -52,20 +52,21 @@ decltype(auto) make_grid(F &&func, As... args) {
   return Grid<4, F>(std::forward<F>(func), args...);
 }
 
-// storage: underlying data representation of a topological representation
-template <int D, class Mode, class T> struct Storage;
-
-namespace storage_mode {
+enum storage_mode {
   // on the device, as a texture
-  class Textures;
+  TEXTURES,
   // on the host, as a 1D buffer
-  class HostBuffer;
-} // namespace storage_mode
+  HOSTBUFFER,
+  NO_STORAGE_MODES
+};
 
-template <class Mode> using RenderStorage = Storage<4, Mode, uint8_t>;
+// storage: underlying data representation of a topological representation
+template <int D, storage_mode StorageMode, class T> struct Storage;
+
+template <storage_mode StorageMode> using RenderStorage = Storage<4, StorageMode, uint8_t>;
 
 template <typename T>
-struct Storage<4, storage_mode::HostBuffer, T> {
+struct Storage<4, storage_mode::HOSTBUFFER, T> {
   int w=0, h=0;
 
   static constexpr int dim = 4;
@@ -105,20 +106,16 @@ struct Storage<4, storage_mode::HostBuffer, T> {
 
 // ways to access the storage (differential topology)
 // sometimes this is cleaner than using macro-topology
-namespace access_mode {
+enum access_mode {
   // as arectangle
-  class bounded;
-  // as a toroid
-  class looped;
-  // with a compute shader (not implemented, because macbooks don't support GL4.2)
-  class compute_shader;
-} // namespace access_mode
+  bounded, looped
+};
 
-template <typename AUT, typename StorageT, typename Mode> struct Access;
+template <typename AUT, typename StorageT, access_mode AccessMode> struct Access;
 
 template <typename AUT, typename T>
-struct Access<AUT, Storage<4, storage_mode::HostBuffer, T>, access_mode::bounded> {
-  using StorageT = Storage<4, storage_mode::HostBuffer, T>;
+struct Access<AUT, Storage<4, storage_mode::HOSTBUFFER, T>, access_mode::bounded> {
+  using StorageT = Storage<4, storage_mode::HOSTBUFFER, T>;
 
   static typename StorageT::value_type access(const StorageT &s, int i) {
     return access(s, i / s.w, i % s.w);
@@ -126,7 +123,7 @@ struct Access<AUT, Storage<4, storage_mode::HostBuffer, T>, access_mode::bounded
 
   static typename StorageT::value_type access(const StorageT &s, int y, int x) {
     int w=s.w,h=s.h;
-    if(y < 0 || y > h || x < 0 || x > w) {
+    if(y < 0 || y >= h || x < 0 || x >= w) {
       return AUT::outside_state;
     }
     return s.buffer[y * w + x];
@@ -134,8 +131,8 @@ struct Access<AUT, Storage<4, storage_mode::HostBuffer, T>, access_mode::bounded
 };
 
 template <typename AUT, typename T>
-struct Access<AUT, Storage<4, storage_mode::HostBuffer, T>, access_mode::looped> {
-  using StorageT = Storage<4, storage_mode::HostBuffer, T>;
+struct Access<AUT, Storage<4, storage_mode::HOSTBUFFER, T>, access_mode::looped> {
+  using StorageT = Storage<4, storage_mode::HOSTBUFFER, T>;
 
   static typename StorageT::value_type access(const StorageT &s, int i) {
     return access(s, i / s.w, i % s.w);

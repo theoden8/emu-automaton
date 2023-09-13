@@ -9,8 +9,8 @@
 
 template <typename StorageT> struct Life106Decoder;
 
-template <typename Mode> struct Life106Decoder<RenderStorage<Mode>> {
-  using StorageT = RenderStorage<Mode>;
+template <storage_mode StorageMode> struct Life106Decoder<RenderStorage<StorageMode>> {
+  using StorageT = RenderStorage<StorageMode>;
   static void read(const char *filename, StorageT &buf) {
     FILE *fp = fopen(filename, "r");
     filestream fs(fp);

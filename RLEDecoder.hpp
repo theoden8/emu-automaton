@@ -10,9 +10,9 @@
 template <typename StorageT> struct RLEDecoder;
 
 // not working yet
-template <typename Mode>
-struct RLEDecoder<RenderStorage<Mode>> {
-  using StorageT = RenderStorage<Mode>;
+template <storage_mode StorageMode>
+struct RLEDecoder<RenderStorage<StorageMode>> {
+  using StorageT = RenderStorage<StorageMode>;
 
   static void read(const char *filename, StorageT &buf) {
     FILE *fp = fopen(filename, "r");

@@ -25,7 +25,7 @@
 struct InterfaceApp {
   Window &w;
   struct nk_glfw nkglfw = {0};
-  const std::vector<int> factors = {-4, -2, 1, 2, 4, 8, 16, 32};
+  const std::vector<int> factors = {-4, -3, -2, 1, 2, 4, 8, 16, 32};
   int factor = 2;
 
   struct nk_context *ctx = nullptr;
@@ -131,7 +131,7 @@ struct InterfaceApp {
   };
 
   enum AutomataType : int {
-    LINEAR, CELLULAR, PROBABILISTIC,
+    LINEAR, CELLULAR, PROBABILISTIC, NO_AUTOMATA_TYPES
   };
   const sys::Path root_path;
 
@@ -148,6 +148,7 @@ struct InterfaceApp {
 
   void run() {
     w.update_size();
+    Logger::Info("interface app\n");
     w.run(
       // setup
       [&](auto &w) mutable -> void {
@@ -157,7 +158,7 @@ struct InterfaceApp {
           struct nk_font_atlas *atlas;
           nk_glfw3_font_stash_begin(&nkglfw, &atlas);
           const sys::Path font_path = root_path / sys::Path("resources"s) / sys::Path("DroidSans.ttf"s);
-          Logger::Info("loading font from %s", std::string(font_path).c_str());
+          Logger::Info("loading font from %s\n", std::string(font_path).c_str());
           struct nk_font *droid = nk_font_atlas_add_from_file(atlas, std::string(font_path).c_str(), 24, 0);
           /*struct nk_font *roboto = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/Roboto-Regular.ttf", 14, 0);*/
           /*struct nk_font *future = nk_font_atlas_add_from_file(atlas, "nuklear/extra_font/kenvector_future_thin.ttf", 13, 0);*/
@@ -179,6 +180,7 @@ struct InterfaceApp {
         {
           nk_layout_row_dynamic(ctx, 30, 1);
           nk_label(ctx, "Automaton type", NK_TEXT_CENTERED);
+          nk_layout_row_dynamic(ctx, 30, NO_AUTOMATA_TYPES);
           /* ASSERT(nk_group_begin(ctx, "Type", NK_WINDOW_BORDER)); */
           if(nk_option_label(ctx, "Linear", autType == AutomataType::LINEAR)) {
             if(autType != AutomataType::LINEAR) {

@@ -15,44 +15,104 @@
 
 using namespace std::literals::string_literals;
 
-template <typename AUT, typename StorageMode, typename AccessMode> struct Renderer;
-
-template <typename AUT, typename AccessMode>
-struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
-  using StorageT = RenderStorage<storage_mode::HostBuffer>;
-  using AccessT = Access<AUT, StorageT, AccessMode>;
-
+template <typename AUT>
+struct GenericRenderer {
   AUT &aut;
   int w, h;
+
+  gl::Uniform<gl::UniformType::SAMPLER2D> uSampler;
+  gl::Uniform<gl::UniformType::UINTEGER> uNstates;
+  gl::Uniform<gl::UniformType::INTEGER> uColorscheme;
+
+  virtual storage_mode get_storage_mode() = 0;
+
+  explicit GenericRenderer(AUT &aut):
+    aut(aut),
+    w(0), h(0),
+    uSampler("grid"s),
+    uNstates("no_states"s),
+    uColorscheme("colorscheme"s)
+  {}
+
+  virtual void init(int w_, int h_, int zoom=0, const char *filename=nullptr) = 0;
+  virtual void update() = 0;
+
+  template <typename ShaderProgramRenderT>
+  void init_uniforms(const ShaderProgramRenderT &prog) {
+    init_uniforms_renderer(prog, 0);
+  }
+
+  template <typename ShaderProgramRenderT>
+  void init_uniforms_renderer(const ShaderProgramRenderT &prog, int colorscheme) {
+    uSampler.set_id(prog.id());
+    uNstates.set_id(prog.id());
+    uNstates.set_data(AUT::no_states);
+    uColorscheme.set_id(prog.id());
+    uColorscheme.set_data(colorscheme);
+  }
+
+  void set_data_renderer(int index) {
+    // TEXTURES: maybe
+    // uSampler.set_datindex(current_tex ? 0 : 1);
+    uSampler.set_data(index);
+    uNstates.set_data(AUT::no_states);
+    uColorscheme.set_data(0);
+  }
+
+  virtual void set_active(int index=0) = 0;
+
+  GLint get_active_texture() {
+    GLint active_tex;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &active_tex); GLERROR
+    return active_tex;
+  }
+
+  virtual void bind_texture() = 0;
+
+  static void unbind_texture() {
+    gl::Texture<GL_TEXTURE_2D>::unbind();
+  }
+
+  virtual void clear() = 0;
+};
+
+template <typename AUT, storage_mode StorageMode, access_mode AccessMode> struct Renderer;
+
+template <typename AUT, access_mode AccessMode>
+struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRenderer<AUT> {
+  using parent_t = GenericRenderer<AUT>;
+  using StorageT = RenderStorage<storage_mode::HOSTBUFFER>;
+  using AccessT = Access<AUT, StorageT, AccessMode>;
+
+  using parent_t::aut;
+  using parent_t::w;
+  using parent_t::h;
+
   int tw, th;
 
   GLuint tex = 0;
-  gl::Uniform<gl::UniformType::SAMPLER2D> uSampler;
-  gl::Uniform<gl::UniformType::INTEGER> uNstates;
 
   int8_t current_buf = 0;
   static constexpr bool doublebuffer = (AUT::update_mode == ::update_mode::ALL);
   bool extrabuf = false;
   StorageT finalbuf, buf1, buf2;
 
-  const int color_per_state;
+  storage_mode get_storage_mode() override {
+    return storage_mode::HOSTBUFFER;
+  }
 
-  explicit Renderer(AUT &aut, const std::string &u_sampler_name, const std::string &u_nstates_name):
-    aut(aut),
-    w(0), h(0),
-    tw(0), th(0),
-    uSampler(u_sampler_name.c_str()),
-    uNstates(u_nstates_name.c_str()),
-    color_per_state(UINT8_MAX / (AUT::no_states - 1))
+  explicit Renderer(AUT &aut, const std::string &dir):
+    parent_t(aut),
+    tw(0), th(0)
   {}
 
-  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) {
+  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
     if(zoom==0)zoom=1;
     if(zoom > 0) {
       w_ /= zoom, h_ /= zoom;
-      tw = w_, th = h_;
+      tw=w_, th=h_;
     } else if(zoom < 0) {
-      tw = w_, th = h_;
+      tw=w_, th=h_;
       w_ *= -zoom, h_ *= -zoom;
     }
     w=w_,h=h_;
@@ -74,19 +134,17 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
     if(filename == nullptr) {
       #pragma omp parallel for
       for(int i = 0; i < w * h; ++i) {
-        buf1.buffer[i] = AUT::init_state(i / buf1.w, i % buf1.w) * color_per_state;
+        buf1.buffer[i] = AUT::init_state(i / buf1.w, i % buf1.w);
       }
     } else {
       RLEDecoder<StorageT>::read(filename, buf1);
       /* Life106Decoder<StorageT>::read(filename, buf1); */
-      #pragma omp parallel for
-      for(int i=0;i<w*h;++i)buf1.buffer[i]*=color_per_state;
     }
     gl::Texture<GL_TEXTURE_2D>::init(tex);
     reinit_texture();
   }
 
-  void update() {
+  void update() override {
     if constexpr(doublebuffer) {
       StorageT *srcbuf = &buf1, *dstbuf = &buf2;
       if(current_buf) {
@@ -96,9 +154,9 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
       if constexpr(AUT::update_mode == ::update_mode::ALL) {
         #pragma omp parallel for
         for(int i = 0; i < w*h; ++i) {
-          dstbuf->buffer[i] = aut.next_state(make_grid<4>([=, this](int y, int x) mutable -> typename StorageT::value_type {
-            return AccessT::access(*srcbuf, y, x) / color_per_state;
-          }, w, h), i / w, i % w) * color_per_state;
+          dstbuf->buffer[i] = aut.next_state(make_grid<4>([=](int y, int x) mutable -> typename StorageT::value_type {
+            return AccessT::access(*srcbuf, y, x);
+          }, w, h), i / w, i % w);
         }
       }
     } else {
@@ -107,10 +165,10 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
         int num_updates = std::sqrt(w * h) * std::log2(w * h);
         //int num_updates = 1;
         for(int i = 0; i < num_updates; ++i) {
-          auto [index, val] = aut.next_state(make_grid<4>([=, this](int y, int x) mutable -> typename StorageT::value_type {
-            return AccessT::access(*srcbuf, y, x) / color_per_state;
+          auto [index, val] = aut.next_state(make_grid<4>([=](int y, int x) mutable -> typename StorageT::value_type {
+            return AccessT::access(*srcbuf, y, x);
           }, w, h));
-          dstbuf->buffer[index] = val * color_per_state;
+          dstbuf->buffer[index] = val;
         }
       }
     }
@@ -140,7 +198,7 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
       srcbuf = &finalbuf;
     }
     gl::Texture<GL_TEXTURE_2D>::bind(tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, srcbuf->data()); GLERROR
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8UI, tw, th, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, srcbuf->data()); GLERROR
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -149,37 +207,20 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
     gl::Texture<GL_TEXTURE_2D>::unbind();
   }
 
-  static void set_active(int index=0) {
+  void set_active(int index=0) override {
     glActiveTexture(GL_TEXTURE0 + index); GLERROR
   }
 
-  static GLint get_active_texture() {
-    GLint active_tex;
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &active_tex); GLERROR
-    return active_tex;
-  }
-
-  void bind_texture() {
+  void bind_texture() override {
     gl::Texture<GL_TEXTURE_2D>::bind(tex);
   }
 
-  template <typename ShaderProgramT>
-  void init_uniforms(const ShaderProgramT &prog) {
-    uSampler.set_id(prog.id());
-    uNstates.set_id(prog.id());
-    uNstates.set_data(AUT::no_states);
+  template <typename ShaderProgramRenderT>
+  void init_uniforms(const ShaderProgramRenderT &prog) {
+    parent_t::init_uniforms_renderer(prog, extrabuf ? 1 : 0);
   }
 
-  void set_data(int index) {
-    uSampler.set_data(index);
-    uNstates.set_data(AUT::no_states);
-  }
-
-  static void unbind_texture() {
-    gl::Texture<GL_TEXTURE_2D>::unbind();
-  }
-
-  void clear() {
+  void clear() override {
     gl::Texture<GL_TEXTURE_2D>::clear(tex);
     buf1.clear();
     buf2.clear();
@@ -190,95 +231,141 @@ struct Renderer<AUT, storage_mode::HostBuffer, AccessMode> {
   }
 };
 
-/* template <> */
-/* struct Renderer<cellular::GameOfLife, storage_mode::Textures, access_mode::bounded> { */
-/*   using AUT = cellular::GameOfLife; */
-/*   int w, h; */
-/*   int tw,th; */
-/*   gl::ShaderProgram<gl::ComputeShader> compute; */
-/*   gl::Uniform<gl::UniformType::SAMPLER2D> uSampler; */
-/*   int8_t current_tex = 0; */
-/*   GLuint tex1 = 0, tex2 = 0; */
+template <size_t C, access_mode AccessMode>
+struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public GenericRenderer<ca::BSC<C>> {
+  using AUT = ca::BSC<C>;
+  using parent_t = GenericRenderer<AUT>;
+  using StorageT = RenderStorage<storage_mode::HOSTBUFFER>;
 
-/*   using ShaderProgram = decltype(compute); */
+  using parent_t::aut;
+  using parent_t::w;
+  using parent_t::h;
 
-/*   Renderer(std::string s): */
-/*     w(0), h(0), */
-/*     uSampler(s), */
-/*     compute({"shaders/conway.comp"}) */
-/*   {} */
+  int8_t current_tex = 0;
+  GLuint tex1 = 0, tex2 = 0;
+  int wgsize = 1;
+  bool largetexture = false;
 
-/*   void init(int w_, int h_, int zoom=0) { */
-/*     w=w_,h=h_; */
-/*     ShaderProgram::compile_program(compute); */
-/*     if(!zoom)zoom=1; */
-/*     if(zoom > 0) { */
-/*       w_/=zoom,h_/=zoom; */
-/*     } else { */
-/*       w_*=-zoom,h_*=-zoom; */
-/*     } */
-/*     tw=w_,th=h_; */
-/*     uint8_t *buf = new uint8_t[w*h]; */
-/*     for(int i=0;i<w*h;++i)buf[i]=AUT::init_state(i/w,i%w)?~uint8_t(0):0; */
-/*     for(GLuint *tex : {&tex1, &tex2}) { */
-/*       gl::Texture<GL_TEXTURE_2D>::init(*tex); */
-/*       gl::Texture<GL_TEXTURE_2D>::bind(*tex); */
-/*       glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, tw, th, 0, GL_RED, GL_UNSIGNED_BYTE, buf); GLERROR */
-/*       gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); */
-/*       gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); */
-/*       gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MAG_FILTER, GL_NEAREST); */
-/*       gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MIN_FILTER, GL_NEAREST); */
-/*       gl::Texture<GL_TEXTURE_2D>::unbind(); */
-/*     } */
-/*     delete [] buf; */
-/*   } */
+  gl::Uniform<gl::UniformType::SAMPLER2D> uSrcTex, uDstTex;
+  gl::Uniform<gl::UniformType::UINTEGER> uBs, uSs, uC;
+  gl::Uniform<gl::UniformType::INTEGER> uW, uH, uWgsize;
+  gl::Uniform<gl::UniformType::UINTEGER> uAccessMode;
+  gl::ShaderProgram<gl::ComputeShader> compute;
 
-/*   void update() { */
-/*     /1* int wg_size[3]; *1/ */
-/*     /1* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size[0]); GLERROR *1/ */
-/*     /1* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size[1]); GLERROR *1/ */
-/*     /1* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size[2]); GLERROR *1/ */
-/*     /1* Logger::Info("max work group sizes: [%d %d %d]\n", wg_size[0], wg_size[1], wg_size[2]); *1/ */
-/*     /1* int wg_invocations; *1/ */
-/*     /1* glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR *1/ */
-/*     /1* Logger::Info("max work group invocations: %d\n", wg_invocations); *1/ */
-/*     /1* Logger::Info("current tex: %d\n", current_tex); *1/ */
-/*     GLuint srctex = current_tex?tex1:tex2, */
-/*            dsttex = current_tex?tex2:tex1; */
-/*     ShaderProgram::use(compute); */
-/*     glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8); GLERROR */
-/*     glBindImageTexture(1, dsttex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8); GLERROR */
-/*     glUniform1i(glGetUniformLocation(compute.id(), "srcTex"), 0); */
-/*     glUniform1i(glGetUniformLocation(compute.id(), "dstTex"), 1); */
-/*     int lsX=1,lsY=1; */
-/*     compute.dispatch(GLuint(tw)/lsX, GLuint(th)/lsY, 1); */
-/*     ShaderProgram::unuse(); */
-/*     current_tex=current_tex?0:1; */
-/*     /1* glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT *1/ */
-/*     /1*                 | GL_TEXTURE_UPDATE_BARRIER_BIT); GLERROR *1/ */
-/*     glMemoryBarrier(GL_ALL_BARRIER_BITS); GLERROR */
-/*     glFinish(); GLERROR */
-/*   } */
+  using ShaderProgramCompute = decltype(compute);
 
-/*   void set_active(int index) { */
-/*     gl::Texture<GL_TEXTURE_2D>::set_active(index); */
-/*   } */
+  storage_mode get_storage_mode() override {
+    return storage_mode::TEXTURES;
+  }
 
-/*   void set_data(int index) { */
-/*     uSampler.set_data(index); */
-/*   } */
+  explicit Renderer(AUT &aut, const std::string &dir):
+    parent_t(aut),
+    uSrcTex("srcbuf"s), uDstTex("dstbuf"s),
+    uBs("bs"s), uSs("ss"s), uC("c"s),
+    uW("w"s), uH("h"s), uWgsize("wgsize"),
+    uAccessMode("access_mode"s),
+    compute({std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("bsc.comp"s))})
+  {}
 
-/*   void bind_texture() { */
-/*     gl::Texture<GL_TEXTURE_2D>::bind(current_tex?tex1:tex2); */
-/*   } */
+  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
+    w=w_,h=h_;
+    if(!zoom)zoom=1;
+    if(zoom > 0) {
+      w/=zoom,h/=zoom;
+      wgsize = 2;
+    } else {
+      w*=-zoom,h*=-zoom;
+      wgsize = -zoom + 1;
+    }
+    printf("w %d, h %d\n", w, h);
+    largetexture = (zoom < 0);
+    std::vector<uint8_t> buf(w * h, 0);
+    #pragma omp parallel for
+    for(int i = 0; i < w * h; ++i) {
+      buf[i] = AUT::init_state(i/w, i%w);
+    }
+    ShaderProgramCompute::compile_program(compute);
+    for(GLuint *tex_ptr : {&tex1, &tex2}) {
+      GLuint &tex = *tex_ptr;
+      gl::Texture<GL_TEXTURE_2D>::init(tex);
+      gl::Texture<GL_TEXTURE_2D>::bind(tex);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_R8UI, w, h, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, buf.data()); GLERROR
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      gl::Texture<GL_TEXTURE_2D>::unbind();
+    }
+  }
 
-/*   void unbind_texture() { */
-/*     gl::Texture<GL_TEXTURE_2D>::unbind(); */
-/*   } */
+  void init_uniforms_compute() {
+    uSrcTex.set_id(compute.id());
+    uDstTex.set_id(compute.id());
+    uBs.set_id(compute.id());
+    uSs.set_id(compute.id());
+    uC.set_id(compute.id());
+    uW.set_id(compute.id());
+    uH.set_id(compute.id());
+    uWgsize.set_id(compute.id());
+    uAccessMode.set_id(compute.id());
+  }
 
-/*   void clear() { */
-/*     gl::Texture<GL_TEXTURE_2D>::clear(tex1); */
-/*     gl::Texture<GL_TEXTURE_2D>::clear(tex2); */
-/*     ShaderProgram::clear(compute); */
-/*   } */
-/* }; */
+  template <typename ShaderProgramRenderT>
+  void init_uniforms(const ShaderProgramRenderT &prog) {
+    init_uniforms_compute();
+    this->init_uniforms_renderer(prog, largetexture ? 1 : 0);
+  }
+
+  void update() override {
+    set_data_compute();
+    /* int wg_size[3]; */
+    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size[0]); GLERROR */
+    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size[1]); GLERROR */
+    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size[2]); GLERROR */
+    /* Logger::Info("max work group sizes: [%d %d %d]\n", wg_size[0], wg_size[1], wg_size[2]); */
+    /* int wg_invocations; */
+    /* glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR */
+    /* Logger::Info("max work group invocations: %d\n", wg_invocations); */
+    /* Logger::Info("current tex: %d\n", current_tex); */
+    ShaderProgramCompute::use(compute);
+    set_data_compute();
+    GLuint srctex = current_tex?tex1:tex2,
+           dsttex = current_tex?tex2:tex1;
+    glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8UI); GLERROR
+    glBindImageTexture(1, dsttex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI); GLERROR
+    compute.dispatch(GLuint(w + wgsize - 1) / wgsize, GLuint(h + wgsize - 1) / wgsize, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT); GLERROR
+    //glMemoryBarrier(GL_ALL_BARRIER_BITS); GLERROR
+    //glFinish(); GLERROR
+    ShaderProgramCompute::unuse();
+    current_tex = current_tex ? 0 : 1;
+  }
+
+  void set_active(int index=0) override {
+    gl::Texture<GL_TEXTURE_2D>::set_active(GL_TEXTURE0 + index + current_tex);
+  }
+
+  void set_data_compute() {
+    uSrcTex.set_data(current_tex ? 0 : 1);
+    uDstTex.set_data(current_tex ? 1 : 0);
+    int bs = int(aut.bs_bitmask.to_ulong());;
+    uBs.set_data(bs);
+    int ss = int(aut.ss_bitmask.to_ulong());;
+    uSs.set_data(ss);
+    uC.set_data(AUT::no_states);
+    uW.set_data(w);
+    uH.set_data(h);
+    uWgsize.set_data(wgsize);
+    uAccessMode.set_data(AccessMode);
+  }
+
+  void bind_texture() override {
+    gl::Texture<GL_TEXTURE_2D>::bind(current_tex?tex1:tex2);
+  }
+
+  void clear() override {
+    gl::Texture<GL_TEXTURE_2D>::clear(tex1);
+    gl::Texture<GL_TEXTURE_2D>::clear(tex2);
+    ShaderProgramCompute::clear(compute);
+  }
+};

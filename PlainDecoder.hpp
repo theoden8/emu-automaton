@@ -9,8 +9,8 @@
 
 template <typename StorageT> struct PlainDecoder;
 
-template <typename Mode> struct PlainDecoder<RenderStorage<Mode>> {
-  using StorageT = RenderStorage<Mode>;
+template <storage_mode StorageMode> struct PlainDecoder<RenderStorage<StorageMode>> {
+  using StorageT = RenderStorage<StorageMode>;
 
   static void read(const char *filename, StorageT &buf) {
     int w=buf.w,h=buf.h;

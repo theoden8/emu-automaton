@@ -25,6 +25,18 @@ class Window {
 protected:
   const GLFWvidmode *vidmode = nullptr;
   size_t width_, height_;
+
+  bool try_create_window(int gl_major, int gl_minor) {
+    glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, gl_major);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, gl_minor);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //We don't want the old OpenGL
+
+    g_window = window = glfwCreateWindow(width(), height(), "automata", nullptr, nullptr);
+    return (g_window != NULL);
+  }
+
   void init_glfw() {
     int rc = glfwInit();
     ASSERT(rc == 1);
@@ -36,16 +48,24 @@ protected:
     width_ = 800, height_ = 800;
     /* width_ = height_ = std::min(width_, height_); */
 
-    /* glfwWindowHint(GLFW_SAMPLES, 4); */
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //We don't want the old OpenGL
+    bool has_4_3 = try_create_window(4, 3);
+    gl_support_compute_shaders = has_4_3;
+    if(!has_4_3) {
+      Logger::Info("version 4.3 not supported\n");
+      bool has_3_3 = try_create_window(3, 3);
+      ASSERT(has_3_3);
+    }
 
-    g_window = window = glfwCreateWindow(width(), height(), "automata", nullptr, nullptr);
-    ASSERT(window != nullptr);
     glfwMakeContextCurrent(window); GLERROR
     glfwSetKeyCallback(window, keypress_callback); GLERROR
+
+    int glfw_major, glfw_minor, glfw_rev;
+    glfwGetVersion(&glfw_major, &glfw_minor, &glfw_rev);
+    int gl_major, gl_minor;
+    glGetIntegerv(GL_MAJOR_VERSION, &gl_major);
+    glGetIntegerv(GL_MINOR_VERSION, &gl_minor);
+    Logger::Info("glfw version %d.%d.%d\n", glfw_major, glfw_minor, glfw_rev);
+    Logger::Info("gl version %d.%d\n", gl_major, gl_minor);
     Logger::Info("initialized glfw\n");
   }
   void init_controls() {
@@ -56,6 +76,7 @@ protected:
   }
 public:
   GLFWwindow *window = nullptr;
+  bool gl_support_compute_shaders = false;
   Window():
     width_(0),
     height_(0)

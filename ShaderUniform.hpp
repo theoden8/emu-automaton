@@ -12,7 +12,7 @@
 
 namespace gl {
 enum class UniformType {
-  INTEGER, FLOAT,
+  INTEGER, UINTEGER, FLOAT,
   VEC2, VEC3, VEC4,
   MAT2, MAT3, MAT4,
   SAMPLER2D
@@ -21,6 +21,7 @@ enum class UniformType {
 #define using_sc static constexpr GLenum
 template <UniformType U> struct u_cast_type { using type = void; };
 template <> struct u_cast_type <UniformType::INTEGER> { using type = GLint; using_sc gltype = GL_INT; };
+template <> struct u_cast_type <UniformType::UINTEGER> { using type = GLuint; using_sc gltype = GL_UNSIGNED_INT; };
 template <> struct u_cast_type <UniformType::FLOAT> { using type = GLfloat; using_sc gltype = GL_FLOAT; };
 template <> struct u_cast_type <UniformType::VEC2> { using type = glm::vec2; using_sc gltype = GL_FLOAT_VEC2; };
 template <> struct u_cast_type <UniformType::VEC3> { using type = glm::vec3; using_sc gltype = GL_FLOAT_VEC3; };
@@ -90,6 +91,12 @@ template <>
 void gl::Uniform<gl::UniformType::INTEGER>::set_data(Uniform<gl::UniformType::INTEGER>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniform1i(uniformId, data); GLERROR
+}
+
+template <>
+void gl::Uniform<gl::UniformType::UINTEGER>::set_data(Uniform<gl::UniformType::UINTEGER>::dtype data) {
+  CHECK_PROGRAM_ID;
+  glUniform1ui(uniformId, data); GLERROR
 }
 
 template <>

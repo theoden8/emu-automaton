@@ -247,7 +247,7 @@ public:
       glGetActiveAttrib(programId, i, max_length, &actual_length, &size, &type, name);
       if(size > 1) {
         for(int j = 0; j < size; j++) {
-          char long_name[64];
+          char long_name[256];
           sprintf(long_name, "%s[%d]", name, j);
           int location = glGetAttribLocation(programId, long_name);
           Logger::Info("  %d) type:%s name:%s location:%d\n", i, GL_type_to_string(type), long_name, location);
@@ -269,7 +269,7 @@ public:
       glGetActiveUniform(programId, i, max_length, &actual_length, &size, &type, name); GLERROR
       if(size > 1) {
         for(int j = 0; j < size; j++) {
-          char long_name[256];
+          char long_name[512];
           sprintf(long_name, "%s[%d]", name, j);
           int location = glGetUniformLocation(programId, long_name);
           Logger::Info("  %d) type:%s name:%s location:%d\n", i, GL_type_to_string(type), long_name, location);
