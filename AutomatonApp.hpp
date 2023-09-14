@@ -101,9 +101,9 @@ void AutomatonApp::run_with_storage_mode(AUT &&aut, int factor) {
     [&](auto &w) mutable -> bool {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); GLERROR
       // use program
-      /* Logger::Info("draw\n"); */
       automaton.update();
-      /* usleep(1e4*10); */
+//      constexpr int ms = 1e4;
+//      usleep(2*ms);
       // display
       ShaderProgram::use(prog);
       automaton.set_active(0);

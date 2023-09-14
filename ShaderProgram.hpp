@@ -2,8 +2,10 @@
 
 #include <cassert>
 #include <string>
+#include <array>
 #include <vector>
 #include <tuple>
+#include <algorithm>
 
 #include <incgraphics.h>
 #include <Tuple.hpp>
@@ -172,6 +174,35 @@ public:
 
   static void dispatch(size_t x, size_t y, size_t z) {
     glDispatchCompute(x, y, z); GLERROR
+  }
+
+  static glm::ivec3 get_max_wgsize(bool xyz=true) {
+    glm::ivec3 wg_size(0, 0, 0);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size.x); GLERROR
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size.y); GLERROR
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size.z); GLERROR
+    return wg_size;
+  }
+
+  static int get_max_wg_invocations() {
+    int wg_invocations;
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR
+    return wg_invocations;
+  }
+
+  static void print_compute_capabilities() {
+    int wg_size[3];
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size[0]); GLERROR
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size[1]); GLERROR
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size[2]); GLERROR
+    Logger::Info("max work group sizes: [%d %d %d]\n", wg_size[0], wg_size[1], wg_size[2]);
+    int wg_invocations;
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR
+    Logger::Info("max work group invocations: %d\n", wg_invocations);
+  }
+
+  static void barrier(GLenum barrier_bits) {
+    glMemoryBarrier(barrier_bits); GLERROR
   }
 
   static void unuse() {

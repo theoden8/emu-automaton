@@ -14,6 +14,7 @@ namespace gl {
 enum class UniformType {
   INTEGER, UINTEGER, FLOAT,
   VEC2, VEC3, VEC4,
+  IVEC2, IVEC3, IVEC4,
   MAT2, MAT3, MAT4,
   SAMPLER2D
 };
@@ -26,6 +27,9 @@ template <> struct u_cast_type <UniformType::FLOAT> { using type = GLfloat; usin
 template <> struct u_cast_type <UniformType::VEC2> { using type = glm::vec2; using_sc gltype = GL_FLOAT_VEC2; };
 template <> struct u_cast_type <UniformType::VEC3> { using type = glm::vec3; using_sc gltype = GL_FLOAT_VEC3; };
 template <> struct u_cast_type <UniformType::VEC4> { using type = glm::vec4; using_sc gltype = GL_FLOAT_VEC4; };
+template <> struct u_cast_type <UniformType::IVEC2> { using type = glm::ivec2; using_sc gltype = GL_INT_VEC2; };
+template <> struct u_cast_type <UniformType::IVEC3> { using type = glm::ivec3; using_sc gltype = GL_INT_VEC3; };
+template <> struct u_cast_type <UniformType::IVEC4> { using type = glm::ivec4; using_sc gltype = GL_INT_VEC4; };
 template <> struct u_cast_type <UniformType::MAT2> { using type = glm::mat2; using_sc gltype = GL_FLOAT_MAT2; };
 template <> struct u_cast_type <UniformType::MAT3> { using type = glm::mat3; using_sc gltype = GL_FLOAT_MAT3; };
 template <> struct u_cast_type <UniformType::MAT4> { using type = glm::mat4; using_sc gltype = GL_FLOAT_MAT4; };
@@ -122,6 +126,25 @@ void Uniform<UniformType::VEC4>::set_data(Uniform<UniformType::VEC4>::dtype data
   CHECK_PROGRAM_ID;
   glUniform4f(uniformId, data.x, data.y, data.z, data.t); GLERROR
 }
+
+template <>
+void gl::Uniform<gl::UniformType::IVEC2>::set_data(Uniform<gl::UniformType::IVEC2>::dtype data) {
+  CHECK_PROGRAM_ID;
+  glUniform2i(uniformId, data.x, data.y); GLERROR
+}
+
+template <>
+void gl::Uniform<gl::UniformType::IVEC3>::set_data(Uniform<gl::UniformType::IVEC3>::dtype data) {
+  CHECK_PROGRAM_ID;
+  glUniform3i(uniformId, data.x, data.y, data.z); GLERROR
+}
+
+template <>
+void Uniform<UniformType::IVEC4>::set_data(Uniform<UniformType::IVEC4>::dtype data) {
+  CHECK_PROGRAM_ID;
+  glUniform4i(uniformId, data.x, data.y, data.z, data.t); GLERROR
+}
+
 
 template <>
 void Uniform<UniformType::MAT2>::set_data(Uniform<UniformType::MAT2>::dtype data) {

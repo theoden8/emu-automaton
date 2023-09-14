@@ -16,12 +16,12 @@ message("C++ Compiler ${CMAKE_CXX_COMPILER}")
 # endif()
 
 if(UNIX AND NOT APPLE)
-  set(CMAKE_CXX_FLAGS "-std=c++17 -fopenmp -Wall")
+  set(CMAKE_CXX_FLAGS "-std=c++20 -fopenmp -Wall -Wextra -Wno-unused-variable -Wno-deprecated-enum-enum-conversion -Wno-unused-parameter")
 else()
 if(WIN32)
-  set(CMAKE_CXX_FLAGS "/std:c++17")
+  set(CMAKE_CXX_FLAGS "/std:c++20")
 else()
-  set(CMAKE_CXX_FLAGS "-std=c++17 -Wall")
+  set(CMAKE_CXX_FLAGS "-std=c++20 -Wall -Wextra")
 endif(WIN32)
 endif()
 
@@ -39,13 +39,22 @@ if(APPLE)
     ${SHADERS}
     ${HEADERS}
     ./main.cpp)
+    set_target_properties(${exec} PROPERTIES
+        BUNDLE True
+        MACOSX_BUNDLE_GUI_IDENTIFIER org.codeberg.theoden8.${exec}
+        MACOSX_BUNDLE_BUNDLE_NAME ${exec}
+        MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+        MACOSX_BUNDLE_ICONFILE "automaton.icns"
+        #MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/resources/Info.plist
+    )
 else()
   add_executable(${exec} ./main.cpp ${HEADERS} ${SHADERS})
 endif()
 include_directories($(CMAKE_CURRENT_SOURCE_DIR))
 
 file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY resources/DroidSans.ttf DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY resources/DroidSans.ttf DESTINATION ${CMAKE_BINARY_DIR}/resources)
 
 find_package(Threads REQUIRED)
 if(THREADS_HAVE_PTHREAD_ARG)
@@ -132,7 +141,7 @@ ExternalProject_Add(Nuklear
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
-    )
+)
 include_directories(${CMAKE_BINARY_DIR}/Nuklear-prefix/src)
 
 add_dependencies(${exec} Nuklear)

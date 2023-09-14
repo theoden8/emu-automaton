@@ -38,7 +38,7 @@ struct Shader {
   sys::File file;
   GLuint shaderId = 0;
 
-  Shader(std::string filename):
+  explicit Shader(std::string filename):
     file(filename.c_str())
   {
     if(file.is_ext(".vert")) { ASSERT(ShaderT == gl::ShaderType::VERTEX); } else
@@ -50,11 +50,14 @@ struct Shader {
       throw std::runtime_error("unknown shader type");
     }
   }
+
   ~Shader()
   {}
+
   int id() const {
     return shaderId;
   }
+
   void init() {
     shaderId = glCreateShader(gl::get_gl_shader_constant<ShaderT>()); GLERROR
     std::string source_code = file.load_text();

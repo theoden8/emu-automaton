@@ -38,11 +38,6 @@ struct GenericRenderer {
   virtual void update() = 0;
 
   template <typename ShaderProgramRenderT>
-  void init_uniforms(const ShaderProgramRenderT &prog) {
-    init_uniforms_renderer(prog, 0);
-  }
-
-  template <typename ShaderProgramRenderT>
   void init_uniforms_renderer(const ShaderProgramRenderT &prog, int colorscheme) {
     uSampler.set_id(prog.id());
     uNstates.set_id(prog.id());
@@ -243,14 +238,17 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
 
   int8_t current_tex = 0;
   GLuint tex1 = 0, tex2 = 0;
-  int wgsize = 1;
+  glm::ivec2 wg_per_cell = glm::ivec2(1, 1);
   bool largetexture = false;
 
   gl::Uniform<gl::UniformType::SAMPLER2D> uSrcTex, uDstTex;
   gl::Uniform<gl::UniformType::UINTEGER> uBs, uSs, uC;
-  gl::Uniform<gl::UniformType::INTEGER> uW, uH, uWgsize;
+  gl::Uniform<gl::UniformType::IVEC2> uSize, uWgPerCell;
   gl::Uniform<gl::UniformType::UINTEGER> uAccessMode;
   gl::ShaderProgram<gl::ComputeShader> compute;
+  static constexpr int local_size = 8;
+  const int max_wg_invocations;
+  glm::ivec2 wg_size = glm::ivec2(0, 0);
 
   using ShaderProgramCompute = decltype(compute);
 
@@ -262,23 +260,38 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     parent_t(aut),
     uSrcTex("srcbuf"s), uDstTex("dstbuf"s),
     uBs("bs"s), uSs("ss"s), uC("c"s),
-    uW("w"s), uH("h"s), uWgsize("wgsize"),
+    uSize("size"s), uWgPerCell("wg_per_cell"),
     uAccessMode("access_mode"s),
-    compute({std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("bsc.comp"s))})
+    compute({std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("bsc.comp"s))}),
+    max_wg_invocations(compute.get_max_wg_invocations())
   {}
 
-  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
+  void set_grid_size(int w_, int h_, int zoom) {
     w=w_,h=h_;
     if(!zoom)zoom=1;
     if(zoom > 0) {
       w/=zoom,h/=zoom;
-      wgsize = 2;
     } else {
       w*=-zoom,h*=-zoom;
-      wgsize = -zoom + 1;
     }
-    printf("w %d, h %d\n", w, h);
+    Logger::Info("[w %d, h %d]\n", w, h);
     largetexture = (zoom < 0);
+  }
+
+  void set_work_group_sizes() {
+    const glm::ivec2 max_wg_size = compute.get_max_wgsize();
+    glm::ivec2 max_invocations = max_wg_size * local_size;
+    wg_per_cell = (glm::ivec2(w, h) + max_invocations - 1) / max_invocations + 1;
+//    Logger::Info("[max_invocations/w = %d/%d = %.2f wg_per_cell_x %d]\n", max_invocations, w, float(max_invocations) / float(w), wg_per_cell.x);
+//    Logger::Info("[max_invocations/h = %d/%d = %.2f wg_per_cell_y %d]\n", max_invocations, w, float(max_invocations) / float(h), wg_per_cell.y);
+    glm::ivec2 per_cell = wg_per_cell * local_size;
+    wg_size = (glm::ivec2(w, h) + per_cell - 1) / per_cell;
+    Logger::Info("[wg %dx%dx%d %dx%dx%d]\n", wg_size.x, local_size, wg_per_cell.x, wg_size.y, local_size, wg_per_cell.y);
+  }
+
+  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
+    set_grid_size(w_, h_, zoom);
+    set_work_group_sizes();
     std::vector<uint8_t> buf(w * h, 0);
     #pragma omp parallel for
     for(int i = 0; i < w * h; ++i) {
@@ -296,6 +309,7 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
       gl::Texture<GL_TEXTURE_2D>::param(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       gl::Texture<GL_TEXTURE_2D>::unbind();
     }
+    compute.print_compute_capabilities();
   }
 
   void init_uniforms_compute() {
@@ -304,9 +318,8 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     uBs.set_id(compute.id());
     uSs.set_id(compute.id());
     uC.set_id(compute.id());
-    uW.set_id(compute.id());
-    uH.set_id(compute.id());
-    uWgsize.set_id(compute.id());
+    uSize.set_id(compute.id());
+    uWgPerCell.set_id(compute.id());
     uAccessMode.set_id(compute.id());
   }
 
@@ -318,24 +331,15 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
 
   void update() override {
     set_data_compute();
-    /* int wg_size[3]; */
-    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &wg_size[0]); GLERROR */
-    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &wg_size[1]); GLERROR */
-    /* glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &wg_size[2]); GLERROR */
-    /* Logger::Info("max work group sizes: [%d %d %d]\n", wg_size[0], wg_size[1], wg_size[2]); */
-    /* int wg_invocations; */
-    /* glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &wg_invocations); GLERROR */
-    /* Logger::Info("max work group invocations: %d\n", wg_invocations); */
-    /* Logger::Info("current tex: %d\n", current_tex); */
     ShaderProgramCompute::use(compute);
     set_data_compute();
     GLuint srctex = current_tex?tex1:tex2,
            dsttex = current_tex?tex2:tex1;
     glBindImageTexture(0, srctex, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8UI); GLERROR
     glBindImageTexture(1, dsttex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI); GLERROR
-    compute.dispatch(GLuint(w + wgsize - 1) / wgsize, GLuint(h + wgsize - 1) / wgsize, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT); GLERROR
-    //glMemoryBarrier(GL_ALL_BARRIER_BITS); GLERROR
+    compute.dispatch(wg_size.x, wg_size.y, 1);
+    compute.barrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT);
+    //compute.barrier(GL_ALL_BARRIER_BITS); GLERROR
     //glFinish(); GLERROR
     ShaderProgramCompute::unuse();
     current_tex = current_tex ? 0 : 1;
@@ -353,9 +357,9 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     int ss = int(aut.ss_bitmask.to_ulong());;
     uSs.set_data(ss);
     uC.set_data(AUT::no_states);
-    uW.set_data(w);
-    uH.set_data(h);
-    uWgsize.set_data(wgsize);
+    glm::ivec2 val_size(w, h);
+    uSize.set_data(val_size);
+    uWgPerCell.set_data(wg_per_cell);
     uAccessMode.set_data(AccessMode);
   }
 

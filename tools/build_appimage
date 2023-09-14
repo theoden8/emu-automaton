@@ -10,7 +10,7 @@ cd build_appimage || {
   >&2 echo "error: failed to change directory"
   exit 1
 }
-cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_COMPILER=$(which clang++) || {
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_COMPILER=$(which clang++) || {
   >&2 echo "error running cmake"
 }
 make install -j4 DESTDIR=AppDir

@@ -157,8 +157,8 @@ struct LangtonsAnt {
 //              << "(" << x << " " << y << ")"
 //              << std::endl;
     assert(dir >= 0 && dir < direction::NO_DIRS);
-    if(x<0)x+=w;if(x>=w)x-=w;
-    if(y<0)y+=h;if(y>=h)y-=h;
+    if(x<0)x+=w;else if(x>=w)x-=w;
+    if(y<0)y+=h;else if(y>=h)y-=h;
     const int old_cursor = cursor;
     cursor = y * w + x;
     return std::make_pair(old_cursor, new_val);

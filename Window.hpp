@@ -51,10 +51,11 @@ protected:
     bool has_4_3 = try_create_window(4, 3);
     gl_support_compute_shaders = has_4_3;
     if(!has_4_3) {
-      Logger::Info("version 4.3 not supported\n");
+      Logger::Info("GL version 4.3 not supported\n");
       bool has_3_3 = try_create_window(3, 3);
       ASSERT(has_3_3);
     }
+    Logger::Info("GL compute shaders %s\n", gl_support_compute_shaders ? "supported" : "NOT supported");
 
     glfwMakeContextCurrent(window); GLERROR
     glfwSetKeyCallback(window, keypress_callback); GLERROR
@@ -67,6 +68,13 @@ protected:
     Logger::Info("glfw version %d.%d.%d\n", glfw_major, glfw_minor, glfw_rev);
     Logger::Info("gl version %d.%d\n", gl_major, gl_minor);
     Logger::Info("initialized glfw\n");
+//    GLint gl_num_extensions = 0;
+//    glGetIntegerv(GL_NUM_EXTENSIONS, &gl_num_extensions); GLERROR
+//    Logger::Info("gl extensions:\n");
+//    for(int i = 0; i < gl_num_extensions; ++i) {
+//      const char *gl_extension_name = (const char *)glGetStringi(GL_EXTENSIONS, i); GLERROR
+//      Logger::Info("  %s\n", gl_extension_name);
+//    }
   }
   void init_controls() {
     // ensure we can capture the escape key

@@ -17,7 +17,7 @@ class Logger {
   static FILE *log_file_ptr;
   std::mutex mtx;
 
-  Logger(const char *filename):
+  explicit Logger(const char *filename):
     filename(filename)
   {
     /* #ifndef NDEBUG */

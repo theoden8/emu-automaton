@@ -14,15 +14,32 @@ This is a random **Day and night** simulation:
 
 # Tools
 
-* c++17, clang++
-* opengl 4, libepoxy
+* c++20, clang++
+* opengl 3/4, libepoxy, glfw
 * [Nuklear](https://github.com/Immediate-Mode-UI/Nuklear)
+
+# Special features
+
+* GPU-powered updates
+* Ising model
+* Multi-state automata
 
 # Implementation
 
-Currently, the implementation uses a double-buffer of two GL_R8 textures of sizes proportional to the size of window.
-
-An implementation using GLSL compute shader is attempted, but is not successful yet.
+* Renderer
+    * GLSL compute shaders (only B/S/C automata, when compute shaders are supported)
+    * OpenMP-powered updates on CPU otherwise
+* Storage mode
+    * Textures (B/S/C automata)
+    * CPU memory
+        * Single buffer on CPU for automata where individual cells are updated (e.g. Ising model)
+        * Double-buffer on CPU for update-all cellular automata
+        * Extra buffer for case when buffer is larger than screen (for averaging)
+* Access mode
+    * Bounded
+    * Toroid (looped)
+* Topology
+    * Grid
 
 # Compiling
 
@@ -35,6 +52,16 @@ make -C build
 # running
 ./build/automaton
 ```
+
+# Potential roadmap
+
+* Loading specific patterns
+* More kinds of initializations
+* Triangular/Hexagonal topologies
+* More kinds of rules
+* More stochastic automata
+* Continuous automata
+* Training a model to learn evolution of a stable CA
 
 # References
 
@@ -49,3 +76,4 @@ make -C build
 * http://uncomp.uwe.ac.uk/genaro/rule110/glidersRule110.html
 * https://neerc.ifmo.ru/wiki/index.php?title=%D0%9A%D0%BE%D0%BB%D0%BC%D0%BE%D0%B3%D0%BE%D1%80%D0%BE%D0%B2%D1%81%D0%BA%D0%B0%D1%8F_%D1%81%D0%BB%D0%BE%D0%B6%D0%BD%D0%BE%D1%81%D1%82%D1%8C
 * http://www.chaos-math.org/en
+* http://www.mirekw.com/ca/ca_rules.html
