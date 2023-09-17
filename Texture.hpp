@@ -50,6 +50,12 @@ struct Texture {
     glActiveTexture(GL_TEXTURE0 + ind); GLERROR
   }
 
+  static GLuint get_active() {
+    GLint active_tex;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &active_tex); GLERROR
+    return active_tex;
+  }
+
   static void unbind() {
     glBindTexture(TextureType, 0); GLERROR
   }

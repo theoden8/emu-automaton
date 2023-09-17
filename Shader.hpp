@@ -37,6 +37,7 @@ template <ShaderType ShaderT>
 struct Shader {
   sys::File file;
   GLuint shaderId = 0;
+  static constexpr ShaderType shader_type = ShaderT;
 
   explicit Shader(std::string filename):
     file(filename.c_str())

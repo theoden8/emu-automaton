@@ -20,14 +20,16 @@ class Logger {
   explicit Logger(const char *filename):
     filename(filename)
   {
-    /* #ifndef NDEBUG */
+    #ifndef NDEBUG
       sys::File::truncate(this->filename);
       file = fopen(this->filename.c_str(), "w");
       ASSERT(file != nullptr);
-    /* #endif */
+    #else
+      file = stdout;
+    #endif
   }
   ~Logger() {
-    if(file != nullptr) {
+    if(file != nullptr && file != stdout && file != stderr) {
       fclose(file);
     }
   }

@@ -111,7 +111,7 @@ public:
     width_=w, height_=h;
   }
   template <typename SF, typename DF, typename CF>
-  void run(SF &&setupfunc, DF &&dispfunc, CF &&cleanupfunc) {
+  bool run(SF &&setupfunc, DF &&dispfunc, CF &&cleanupfunc) {
     setupfunc(*this);
     glfwSwapInterval(1); GLERROR
     bool shouldClose = false;
@@ -121,8 +121,10 @@ public:
       glfwPollEvents(); GLERROR
       glfwSwapBuffers(window); GLERROR
     }
+    bool ret = !esc_triggered;
     esc_triggered = false;
     cleanupfunc(*this);
+    return ret;
   }
   void quit() {
     g_current_window = nullptr;

@@ -13,9 +13,8 @@
 
 namespace sca {
 
-template <typename SCA>
-inline uint8_t random(int y, int x) {
-  return rand() % SCA::no_states;
+inline uint8_t random(int y, int x, int no_states) {
+  return rand() % no_states;
 }
 
 struct ising_model {
@@ -37,7 +36,7 @@ struct ising_model {
   {}
 
   static inline uint8_t init_state(int y, int x) {
-    return random<self_t>(y, x);
+    return random(y, x, no_states);
   }
 
   template <typename B>

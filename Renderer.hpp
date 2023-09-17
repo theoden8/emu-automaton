@@ -7,6 +7,7 @@
 #include <ShaderAttrib.hpp>
 #include <ShaderUniform.hpp>
 #include <Texture.hpp>
+#include <Window.hpp>
 
 #include <Automaton.hpp>
 #include <RLEDecoder.hpp>
@@ -15,71 +16,106 @@
 
 using namespace std::literals::string_literals;
 
-template <typename AUT>
-struct GenericRenderer {
-  AUT &aut;
+struct TexturedGridRenderer {
+  int no_states;
   int w, h;
 
-  gl::Uniform<gl::UniformType::SAMPLER2D> uSampler;
-  gl::Uniform<gl::UniformType::UINTEGER> uNstates;
-  gl::Uniform<gl::UniformType::INTEGER> uColorscheme;
+  gl::VertexArray
+    vao;
+  gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2>
+    attrVertex; //("vertex"s);
+  gl::ShaderProgram<
+    gl::VertexShader,
+    gl::FragmentShader
+  > prog;
+  gl::Uniform<gl::UniformType::SAMPLER2D>
+    uSampler;
+  gl::Uniform<gl::UniformType::UINTEGER>
+    uNstates;
+  gl::Uniform<gl::UniformType::INTEGER>
+    uColorscheme;
+
+  using ShaderAttrib = decltype(attrVertex);
+  using ShaderProgram = decltype(prog);
+
+  int colorscheme = 0;
 
   virtual storage_mode get_storage_mode() = 0;
 
-  explicit GenericRenderer(AUT &aut):
-    aut(aut),
+  explicit TexturedGridRenderer(int no_states, const std::string &dir):
+    no_states(no_states),
     w(0), h(0),
+    attrVertex("vertex"s),
+    prog({
+      std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("aut4.vert"s)),
+      std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("aut4.frag"s))
+    }),
     uSampler("grid"s),
     uNstates("no_states"s),
     uColorscheme("colorscheme"s)
   {}
 
-  virtual void init(int w_, int h_, int zoom=0, const char *filename=nullptr) = 0;
-  virtual void update() = 0;
+  void init_renderer(Window &w, int factor) {
+    // init attribute vertex
+    ShaderAttrib::init(attrVertex);
+    std::vector<float> points = {
+      1,1, -1,1, -1,-1,
+      -1,-1, 1,1, 1,-1,
+    };
+    attrVertex.allocate<GL_STATIC_DRAW>(points.size() / 2, points.data());
+    // add the attribute to the vertex array
+    gl::VertexArray::init(vao);
+    gl::VertexArray::bind(vao);
+    vao.enable(attrVertex);
+    vao.set_access(attrVertex, 0, 0);
+    gl::VertexArray::unbind();
+    // init shader program
+    ShaderProgram::init(prog, vao, {"attrVertex"});
+    prog.assign_uniforms(uSampler, uNstates, uColorscheme);
+    init_textures(w.width(), w.height(), factor);
+  }
 
-  template <typename ShaderProgramRenderT>
-  void init_uniforms_renderer(const ShaderProgramRenderT &prog, int colorscheme) {
-    uSampler.set_id(prog.id());
-    uNstates.set_id(prog.id());
-    uNstates.set_data(AUT::no_states);
-    uColorscheme.set_id(prog.id());
+  virtual void init_textures(int w_, int h_, int zoom=0, const char *filename=nullptr) = 0;
+  virtual void update_state() = 0;
+  virtual GLuint get_current_texture_id() = 0;
+
+  void render(int global_texture_index) {
+    // display
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); GLERROR
+    // use program
+    ShaderProgram::use(prog);
+    // set uniform data
+    uSampler.set_data(global_texture_index);
+    uNstates.set_data(no_states);
     uColorscheme.set_data(colorscheme);
-  }
-
-  void set_data_renderer(int index) {
-    // TEXTURES: maybe
-    // uSampler.set_datindex(current_tex ? 0 : 1);
-    uSampler.set_data(index);
-    uNstates.set_data(AUT::no_states);
-    uColorscheme.set_data(0);
-  }
-
-  virtual void set_active(int index=0) = 0;
-
-  GLint get_active_texture() {
-    GLint active_tex;
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &active_tex); GLERROR
-    return active_tex;
-  }
-
-  virtual void bind_texture() = 0;
-
-  static void unbind_texture() {
+    // choose texture
+    gl::Texture<GL_TEXTURE_2D>::set_active(global_texture_index);
+    gl::Texture<GL_TEXTURE_2D>::bind(get_current_texture_id());
+    // draw triangles
+    gl::VertexArray::bind(vao);
+    glDrawArrays(GL_TRIANGLES, 0, 6); GLERROR
+    gl::VertexArray::unbind();
+    // unuse
     gl::Texture<GL_TEXTURE_2D>::unbind();
+    ShaderProgram::unuse();
   }
 
-  virtual void clear() = 0;
+  virtual void clear() {
+    ShaderAttrib::clear(attrVertex);
+    gl::VertexArray::clear(vao);
+    ShaderProgram::clear(prog);
+  }
 };
 
 template <typename AUT, storage_mode StorageMode, access_mode AccessMode> struct Renderer;
 
 template <typename AUT, access_mode AccessMode>
-struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRenderer<AUT> {
-  using parent_t = GenericRenderer<AUT>;
+struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public TexturedGridRenderer {
+  using parent_t = TexturedGridRenderer;
   using StorageT = RenderStorage<storage_mode::HOSTBUFFER>;
   using AccessT = Access<AUT, StorageT, AccessMode>;
 
-  using parent_t::aut;
+  AUT &aut;
   using parent_t::w;
   using parent_t::h;
 
@@ -96,12 +132,13 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
     return storage_mode::HOSTBUFFER;
   }
 
-  explicit Renderer(AUT &aut, const std::string &dir):
-    parent_t(aut),
+  explicit Renderer(AUT &_aut, const std::string &dir):
+    parent_t(_aut.no_states, dir),
+    aut(_aut),
     tw(0), th(0)
   {}
 
-  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
+  void init_textures(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
     if(zoom==0)zoom=1;
     if(zoom > 0) {
       w_ /= zoom, h_ /= zoom;
@@ -111,7 +148,10 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
       w_ *= -zoom, h_ *= -zoom;
     }
     w=w_,h=h_;
-    printf("[%d %d] [%d %d]\n", w,h,tw,th);
+    if(zoom < 0) {
+      parent_t::colorscheme = 1;
+    }
+    Logger::Info("[%d %d] [%d %d]\n", w,h,tw,th);
     if(w!=tw||h!=th||extrabuf) {
       extrabuf = true;
       finalbuf.init(tw, th);
@@ -129,7 +169,7 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
     if(filename == nullptr) {
       #pragma omp parallel for
       for(int i = 0; i < w * h; ++i) {
-        buf1.buffer[i] = AUT::init_state(i / buf1.w, i % buf1.w);
+        buf1.buffer[i] = aut.init_state(i / buf1.w, i % buf1.w);
       }
     } else {
       RLEDecoder<StorageT>::read(filename, buf1);
@@ -139,7 +179,7 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
     reinit_texture();
   }
 
-  void update() override {
+  void update_state() override {
     if constexpr(doublebuffer) {
       StorageT *srcbuf = &buf1, *dstbuf = &buf2;
       if(current_buf) {
@@ -178,7 +218,7 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
     if(extrabuf) {
       int per_x = w / tw;
       int per_y = h / th;
-      const int q = per_x * per_y;
+      const int area = per_x * per_y;
       #pragma omp parallel for
       for(int i = 0; i < tw*th; ++i) {
         uint32_t sum = 0;
@@ -188,7 +228,7 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
             sum += srcbuf->buffer[(i / tw * per_y + iy) * w + (i % tw) * per_x + ix];
           }
         }
-        finalbuf.buffer[i] = uint8_t(sum / q);
+        finalbuf.buffer[i] = std::round<uint8_t>(float(sum) / area);
       }
       srcbuf = &finalbuf;
     }
@@ -202,17 +242,8 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
     gl::Texture<GL_TEXTURE_2D>::unbind();
   }
 
-  void set_active(int index=0) override {
-    glActiveTexture(GL_TEXTURE0 + index); GLERROR
-  }
-
-  void bind_texture() override {
-    gl::Texture<GL_TEXTURE_2D>::bind(tex);
-  }
-
-  template <typename ShaderProgramRenderT>
-  void init_uniforms(const ShaderProgramRenderT &prog) {
-    parent_t::init_uniforms_renderer(prog, extrabuf ? 1 : 0);
+  GLuint get_current_texture_id() override {
+    return tex;
   }
 
   void clear() override {
@@ -223,16 +254,17 @@ struct Renderer<AUT, storage_mode::HOSTBUFFER, AccessMode> : public GenericRende
       finalbuf.clear();
       extrabuf = false;
     }
+    parent_t::clear();
   }
 };
 
-template <size_t C, access_mode AccessMode>
-struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public GenericRenderer<ca::BSC<C>> {
-  using AUT = ca::BSC<C>;
-  using parent_t = GenericRenderer<AUT>;
+template <access_mode AccessMode>
+struct Renderer<ca::BSC, storage_mode::TEXTURES, AccessMode> : public TexturedGridRenderer {
+  using AUT = ca::BSC;
+  using parent_t = TexturedGridRenderer;
   using StorageT = RenderStorage<storage_mode::HOSTBUFFER>;
 
-  using parent_t::aut;
+  AUT &aut;
   using parent_t::w;
   using parent_t::h;
 
@@ -256,8 +288,9 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     return storage_mode::TEXTURES;
   }
 
-  explicit Renderer(AUT &aut, const std::string &dir):
-    parent_t(aut),
+  explicit Renderer(AUT &_aut, const std::string &dir):
+    parent_t(_aut.no_states, dir),
+    aut(_aut),
     uSrcTex("srcbuf"s), uDstTex("dstbuf"s),
     uBs("bs"s), uSs("ss"s), uC("c"s),
     uSize("size"s), uWgPerCell("wg_per_cell"),
@@ -266,7 +299,7 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     max_wg_invocations(compute.get_max_wg_invocations())
   {}
 
-  void set_grid_size(int w_, int h_, int zoom) {
+  inline void set_grid_size(int w_, int h_, int zoom) {
     w=w_,h=h_;
     if(!zoom)zoom=1;
     if(zoom > 0) {
@@ -278,7 +311,7 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     largetexture = (zoom < 0);
   }
 
-  void set_work_group_sizes() {
+  inline void set_work_group_sizes() {
     const glm::ivec2 max_wg_size = compute.get_max_wgsize();
     glm::ivec2 max_invocations = max_wg_size * local_size;
     wg_per_cell = (glm::ivec2(w, h) + max_invocations - 1) / max_invocations + 1;
@@ -289,15 +322,24 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     Logger::Info("[wg %dx%dx%d %dx%dx%d]\n", wg_size.x, local_size, wg_per_cell.x, wg_size.y, local_size, wg_per_cell.y);
   }
 
-  void init(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
+  void init_textures(int w_, int h_, int zoom=0, const char *filename=nullptr) override {
     set_grid_size(w_, h_, zoom);
     set_work_group_sizes();
+    if(zoom < 0) {
+      parent_t::colorscheme = 1;
+    }
     std::vector<uint8_t> buf(w * h, 0);
     #pragma omp parallel for
     for(int i = 0; i < w * h; ++i) {
-      buf[i] = AUT::init_state(i/w, i%w);
+      buf[i] = aut.init_state(i/w, i%w);
     }
     ShaderProgramCompute::compile_program(compute);
+    compute.assign_uniforms(
+      uSrcTex, uDstTex,
+      uBs, uSs, uC,
+      uSize, uWgPerCell,
+      uAccessMode
+    );
     for(GLuint *tex_ptr : {&tex1, &tex2}) {
       GLuint &tex = *tex_ptr;
       gl::Texture<GL_TEXTURE_2D>::init(tex);
@@ -312,25 +354,21 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     compute.print_compute_capabilities();
   }
 
-  void init_uniforms_compute() {
-    uSrcTex.set_id(compute.id());
-    uDstTex.set_id(compute.id());
-    uBs.set_id(compute.id());
-    uSs.set_id(compute.id());
-    uC.set_id(compute.id());
-    uSize.set_id(compute.id());
-    uWgPerCell.set_id(compute.id());
-    uAccessMode.set_id(compute.id());
+  void set_data_compute() {
+    uSrcTex.set_data(current_tex ? 0 : 1);
+    uDstTex.set_data(current_tex ? 1 : 0);
+    int bs = int(aut.bs_bitmask.to_ulong());;
+    uBs.set_data(bs);
+    int ss = int(aut.ss_bitmask.to_ulong());;
+    uSs.set_data(ss);
+    uC.set_data(aut.no_states);
+    glm::ivec2 val_size(w, h);
+    uSize.set_data(val_size);
+    uWgPerCell.set_data(wg_per_cell);
+    uAccessMode.set_data(AccessMode);
   }
 
-  template <typename ShaderProgramRenderT>
-  void init_uniforms(const ShaderProgramRenderT &prog) {
-    init_uniforms_compute();
-    this->init_uniforms_renderer(prog, largetexture ? 1 : 0);
-  }
-
-  void update() override {
-    set_data_compute();
+  void update_state() override {
     ShaderProgramCompute::use(compute);
     set_data_compute();
     GLuint srctex = current_tex?tex1:tex2,
@@ -345,31 +383,14 @@ struct Renderer<ca::BSC<C>, storage_mode::TEXTURES, AccessMode> : public Generic
     current_tex = current_tex ? 0 : 1;
   }
 
-  void set_active(int index=0) override {
-    gl::Texture<GL_TEXTURE_2D>::set_active(GL_TEXTURE0 + index + current_tex);
-  }
-
-  void set_data_compute() {
-    uSrcTex.set_data(current_tex ? 0 : 1);
-    uDstTex.set_data(current_tex ? 1 : 0);
-    int bs = int(aut.bs_bitmask.to_ulong());;
-    uBs.set_data(bs);
-    int ss = int(aut.ss_bitmask.to_ulong());;
-    uSs.set_data(ss);
-    uC.set_data(AUT::no_states);
-    glm::ivec2 val_size(w, h);
-    uSize.set_data(val_size);
-    uWgPerCell.set_data(wg_per_cell);
-    uAccessMode.set_data(AccessMode);
-  }
-
-  void bind_texture() override {
-    gl::Texture<GL_TEXTURE_2D>::bind(current_tex?tex1:tex2);
+  GLuint get_current_texture_id() override {
+    return current_tex ? tex1 : tex2;
   }
 
   void clear() override {
     gl::Texture<GL_TEXTURE_2D>::clear(tex1);
     gl::Texture<GL_TEXTURE_2D>::clear(tex2);
     ShaderProgramCompute::clear(compute);
+    parent_t::clear();
   }
 };

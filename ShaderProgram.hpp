@@ -33,34 +33,35 @@ class ShaderProgram {
 
   template <ResourceType rT, ShaderType sT = ShaderType::NO_TYPE>
   static constexpr GLenum get_gl_resource_type() {
-    switch(rT) {
-      case ResourceType::UNIFORM:return GL_UNIFORM;
-      case ResourceType::UNIFORM_BLOCK:return GL_UNIFORM_BLOCK;
-      case ResourceType::PROGRAM_INPUT:return GL_PROGRAM_INPUT;
-      case ResourceType::PROGRAM_OUTPUT:return GL_PROGRAM_OUTPUT;
-      case ResourceType::SUBROUTINE:
-        switch(sT) {
-          case ShaderType::VERTEX: return GL_VERTEX_SUBROUTINE;
-          case ShaderType::TESS_CNTRL: return GL_TESS_CONTROL_SUBROUTINE;
-          case ShaderType::TESS_EVAL: return GL_TESS_EVALUATION_SUBROUTINE;
-          case ShaderType::GEOMETRY: return GL_GEOMETRY_SUBROUTINE;
-          case ShaderType::FRAGMENT: return GL_FRAGMENT_SUBROUTINE;
-          case ShaderType::COMPUTE: return GL_COMPUTE_SUBROUTINE;
-        }
-      case ResourceType::SUBROUTINE_UNIFORM:
-        switch(sT) {
-          case ShaderType::VERTEX: return GL_VERTEX_SUBROUTINE_UNIFORM;
-          case ShaderType::TESS_CNTRL: return GL_TESS_CONTROL_SUBROUTINE_UNIFORM;
-          case ShaderType::TESS_EVAL: return GL_TESS_EVALUATION_SUBROUTINE_UNIFORM;
-          case ShaderType::GEOMETRY: return GL_GEOMETRY_SUBROUTINE_UNIFORM;
-          case ShaderType::FRAGMENT: return GL_FRAGMENT_SUBROUTINE_UNIFORM;
-          case ShaderType::COMPUTE: return GL_COMPUTE_SUBROUTINE_UNIFORM;
-        }
-      case ResourceType::TRANSFORM_FEEDBACK_VARYING:return GL_TRANSFORM_FEEDBACK_VARYING;
-      case ResourceType::TRANSFORM_FEEDBACK_BUFFER:return GL_TRANSFORM_FEEDBACK_BUFFER;
-      case ResourceType::BUFFER_VARIABLE:return GL_BUFFER_VARIABLE;
-      case ResourceType::SHADER_STORAGE_BLOCK:return GL_SHADER_STORAGE_BLOCK;
-    }
+    return 0;
+    /* switch(rT) { */
+    /*   case ResourceType::UNIFORM:return GL_UNIFORM; */
+    /*   case ResourceType::UNIFORM_BLOCK:return GL_UNIFORM_BLOCK; */
+    /*   case ResourceType::PROGRAM_INPUT:return GL_PROGRAM_INPUT; */
+    /*   case ResourceType::PROGRAM_OUTPUT:return GL_PROGRAM_OUTPUT; */
+    /*   case ResourceType::SUBROUTINE: */
+    /*     switch(sT) { */
+    /*       case ShaderType::VERTEX: return GL_VERTEX_SUBROUTINE; */
+    /*       case ShaderType::TESS_CNTRL: return GL_TESS_CONTROL_SUBROUTINE; */
+    /*       case ShaderType::TESS_EVAL: return GL_TESS_EVALUATION_SUBROUTINE; */
+    /*       case ShaderType::GEOMETRY: return GL_GEOMETRY_SUBROUTINE; */
+    /*       case ShaderType::FRAGMENT: return GL_FRAGMENT_SUBROUTINE; */
+    /*       case ShaderType::COMPUTE: return GL_COMPUTE_SUBROUTINE; */
+    /*     } */
+    /*   case ResourceType::SUBROUTINE_UNIFORM: */
+    /*     switch(sT) { */
+    /*       case ShaderType::VERTEX: return GL_VERTEX_SUBROUTINE_UNIFORM; */
+    /*       case ShaderType::TESS_CNTRL: return GL_TESS_CONTROL_SUBROUTINE_UNIFORM; */
+    /*       case ShaderType::TESS_EVAL: return GL_TESS_EVALUATION_SUBROUTINE_UNIFORM; */
+    /*       case ShaderType::GEOMETRY: return GL_GEOMETRY_SUBROUTINE_UNIFORM; */
+    /*       case ShaderType::FRAGMENT: return GL_FRAGMENT_SUBROUTINE_UNIFORM; */
+    /*       case ShaderType::COMPUTE: return GL_COMPUTE_SUBROUTINE_UNIFORM; */
+    /*     } */
+    /*   case ResourceType::TRANSFORM_FEEDBACK_VARYING:return GL_TRANSFORM_FEEDBACK_VARYING; */
+    /*   case ResourceType::TRANSFORM_FEEDBACK_BUFFER:return GL_TRANSFORM_FEEDBACK_BUFFER; */
+    /*   case ResourceType::BUFFER_VARIABLE:return GL_BUFFER_VARIABLE; */
+    /*   case ResourceType::SHADER_STORAGE_BLOCK:return GL_SHADER_STORAGE_BLOCK; */
+    /* } */
   }
 
 public:
@@ -170,6 +171,17 @@ public:
 
   void use() {
     use(id());
+  }
+
+  template <typename ShaderUniformT>
+  int assign_uniform(ShaderUniformT &uniform) const {
+    uniform.set_id(this->id());
+    return 0;
+  }
+
+  template <typename... ShaderUniformTs>
+  void assign_uniforms(ShaderUniformTs& ...uniforms) const {
+    unroll(assign_uniform(uniforms)...);
   }
 
   static void dispatch(size_t x, size_t y, size_t z) {

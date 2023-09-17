@@ -2,41 +2,26 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <cassert>
 #include <type_traits>
 #include <utility>
 
 namespace la {
 
-template <typename LA>
-inline uint8_t random(int y, int x) {
-  return rand() % LA::no_states;
+inline uint8_t random(int y, int x, int no_states) {
+  return rand() % no_states;
 }
 
 constexpr int DEAD = 0, LIVE = 1;
 
-template <typename LA, typename B>
-inline uint64_t get_case(B &prev, int y, int x) {
-  uint64_t result = 0x00;
-  constexpr int N = LA::no_neighbours;
-  constexpr int nn = (N - 1) / 2;
-  for(int i = 0; i < N; ++i) {
-    int cur = -nn + i;
-    if(prev[y][x + cur] == LIVE) {
-      result |= (1 << (N - i - 1));
-    }
-  }
-  return result;
-}
-
-template <size_t N>
 struct Rule {
   using self_t = Rule;
+
   static constexpr int outside_state = 0;
   static constexpr int no_states = 2;
-  static constexpr int no_neighbours = N;
   static constexpr int dim = 4;
   static constexpr int update_mode = ::update_mode::ALL;
-  static void check() { static_assert(N <= 6 && (N & 1)); }
+
   static inline uint8_t init_state(int y, int x) {
     /* if(y == 0) { */
     /*   if(x < 2) { */
@@ -45,14 +30,28 @@ struct Rule {
     /*   return DEAD; */
     /* } */
     if(y == 0) {
-      return random<self_t>(y, x);
+      return random(y, x, no_states);
     }
     return outside_state;
   }
 
-  uint64_t c;
-  inline explicit Rule(uint64_t c):
-    c(c)
+  template <typename B>
+  inline uint64_t get_case(B &prev, int y, int x) {
+    uint64_t result = 0x00;
+    const int nn = (n - 1) / 2;
+    for(int i = 0; i < n; ++i) {
+      int cur = -nn + i;
+      if(prev[y][x + cur] == LIVE) {
+        result |= (1 << (n - i - 1));
+      }
+    }
+    return result;
+  }
+
+  const int n;
+  const uint64_t c;
+  inline explicit Rule(int n, uint64_t c):
+    n(n), c(c)
   {}
 
   template <typename B>
@@ -60,24 +59,26 @@ struct Rule {
     if(y > 0) {
       return prev[y - 1][x];
     }
-    if(c & (uint64_t(1) << get_case<self_t>(prev, 0, x))) {
+    if(c & (uint64_t(1) << get_case(prev, 0, x))) {
       return LIVE;
     }
     return DEAD;
   }
 };
 
-template <int N, uint64_t C>
-decltype(auto) rule() {
-  return Rule<N>(C);
+decltype(auto) rule(int N, uint64_t C) {
+  assert(N <= 6 && (N & 1));
+  return [=]() mutable -> Rule {
+    return Rule(N, C);
+  };
 }
 
 } // namespace la
 
 namespace linear {
-  constexpr auto Rule30  = la::rule<3, 30LLU>;
-  constexpr auto Rule54  = la::rule<3, 54LLU>;
-  constexpr auto Rule90  = la::rule<3, 90LLU>;
-  constexpr auto Rule110 = la::rule<3, 110LLU>;
-  constexpr auto Rule184 = la::rule<3, 184LLU>;
+  decltype(auto) Rule30  = la::rule(3, 30LLU);
+  decltype(auto) Rule54  = la::rule(3, 54LLU);
+  decltype(auto) Rule90  = la::rule(3, 90LLU);
+  decltype(auto) Rule110 = la::rule(3, 110LLU);
+  decltype(auto) Rule184 = la::rule(3, 184LLU);
 } // namespace linear

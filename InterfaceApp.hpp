@@ -22,11 +22,14 @@
 #define MAX_VERTEX_BUFFER (512 * 1024)
 #define MAX_ELEMENT_BUFFER (128 * 1024)
 
+typedef struct _AutOptions {
+  int factor;
+  bool force_cpu;
+} AutOptions;
+
 struct InterfaceApp {
   Window &w;
   struct nk_glfw nkglfw = {0};
-  const std::vector<int> factors = {-4, -3, -2, 1, 2, 4, 8, 16, 32};
-  int factor = 2;
 
   struct nk_context *ctx = nullptr;
   struct nk_color background;
@@ -135,6 +138,9 @@ struct InterfaceApp {
   };
   const sys::Path root_path;
 
+  const std::vector<int> factors = {-16, -8, -4, -3, -2, 1, 2, 4, 8, 16, 32};
+  int factor = 2;
+  int force_cpu = 0;
   int autType = CELLULAR;
   int autStates = 2;
   int autOption = Cellular::DAYANDNIGHT;
@@ -149,7 +155,7 @@ struct InterfaceApp {
   void run() {
     w.update_size();
     Logger::Info("interface app\n");
-    w.run(
+    bool w_ret = w.run(
       // setup
       [&](auto &w) mutable -> void {
         ctx = nk_glfw3_init(&nkglfw, g_window, NK_GLFW3_INSTALL_CALLBACKS);
@@ -364,6 +370,9 @@ struct InterfaceApp {
           for(const int f : factors) {
             if(nk_option_label(ctx, std::to_string(f).c_str(), factor == f)) factor = f;
           }
+          nk_layout_row_dynamic(ctx, 30, 2);
+          nk_label(ctx, "Rendering", NK_TEXT_LEFT);
+          nk_checkbox_label(ctx, "Force CPU", &force_cpu);
           /* nk_group_end(ctx); */
 
 
@@ -401,5 +410,8 @@ struct InterfaceApp {
         nk_glfw3_shutdown(&nkglfw);
       }
     );
+    if(!w_ret) {
+      shouldQuit = true;
+    }
   }
 };
