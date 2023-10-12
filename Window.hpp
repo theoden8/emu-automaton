@@ -43,10 +43,9 @@ protected:
 
     vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     ASSERT(vidmode != nullptr);
-    width_ = vidmode->width;
-    height_ = vidmode->height;
-    width_ = 800, height_ = 800;
-    /* width_ = height_ = std::min(width_, height_); */
+    width_ = std::min<int>(800, vidmode->width - 50);
+    height_ = std::min<int>(800, vidmode->height - 100);
+    width_ = height_ = std::min(width_, height_);
 
     bool has_4_3 = try_create_window(4, 3);
     gl_support_compute_shaders = has_4_3;

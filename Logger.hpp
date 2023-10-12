@@ -66,6 +66,15 @@ public:
     instance->Write(fmt, argptr);
     va_end(argptr);
   }
+  static void Debug(const char *fmt, ...) {
+    #ifndef NDEBUG
+    ASSERT(instance != nullptr);
+    va_list argptr;
+    va_start(argptr, fmt);
+    instance->WriteFmt("DEBG: ", fmt, argptr);
+    va_end(argptr);
+    #endif
+  }
   static void Info(const char *fmt, ...) {
     ASSERT(instance != nullptr);
     va_list argptr;

@@ -17,6 +17,10 @@
 #include <windows.h>
 #endif
 
+#if !defined(_POSIX_VERSION)
+#include <direct.h>
+#endif
+
 namespace sys {
 
 struct Path {
@@ -48,6 +52,17 @@ struct Path {
     return Path(s + separator + ss);
   }
 };
+
+std::string get_cwd() {
+  #if defined(_POSIX_VERSION)
+    char buf[PATH_MAX + 1];
+    getcwd(buf, PATH_MAX);
+  #else
+    char buf[MAX_PATH + 1];
+    _getcwd(buf, MAX_PATH);
+  #endif
+  return buf;
+}
 
 std::string get_executable_directory(int argc, char *argv[]) {
 #ifdef __linux__
@@ -124,7 +139,7 @@ public:
     }
   };
 public:
-  File(const char *filename):
+  explicit File(const char *filename):
     filename(filename)
   {}
 

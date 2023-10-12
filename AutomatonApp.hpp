@@ -38,6 +38,7 @@ public:
   template <typename AUT>
   void run(AUT &&aut, const AutOptions &opts) {
     AutomatonApp &app = (*this);
+    w.update_size();
     constexpr storage_mode storage_mode_recommended = ::use_storage_mode<AUT>::smode;
     if constexpr(storage_mode_recommended == storage_mode::HOSTBUFFER) {
       run_with_storage_mode<storage_mode::HOSTBUFFER>(std::forward<AUT>(aut), opts);

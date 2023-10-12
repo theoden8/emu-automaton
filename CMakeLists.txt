@@ -17,12 +17,10 @@ message("C++ Compiler ${CMAKE_CXX_COMPILER}")
 
 if(UNIX AND NOT APPLE)
   set(CMAKE_CXX_FLAGS "-std=c++20 -fopenmp -Wall -Wextra -Wno-unused-variable -Wno-deprecated-enum-enum-conversion -Wno-unused-parameter")
-else()
-if(WIN32)
+elseif(WIN32)
   set(CMAKE_CXX_FLAGS "/std:c++20")
 else()
   set(CMAKE_CXX_FLAGS "-std=c++20 -Wall -Wextra")
-endif(WIN32)
 endif()
 
 set(exec automaton)

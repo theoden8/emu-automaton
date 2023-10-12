@@ -184,6 +184,17 @@ public:
     unroll(assign_uniform(uniforms)...);
   }
 
+  template <typename ShaderUniformT>
+  static int unassign_uniform(ShaderUniformT &uniform) {
+    uniform.unset_id();
+    return 0;
+  }
+
+  template <typename... ShaderUniformTs>
+  static void unassign_uniforms(ShaderUniformTs& ...uniforms) {
+    unroll(unassign_uniform(uniforms)...);
+  }
+
   static void dispatch(size_t x, size_t y, size_t z) {
     glDispatchCompute(x, y, z); GLERROR
   }

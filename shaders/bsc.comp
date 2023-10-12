@@ -3,9 +3,9 @@
 
 #define LOCAL_SIZE 8
 
-layout(local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE, local_size_z = 1) in;
-layout (binding = 0, r8ui) uniform uimage2D srcTex;
-layout (binding = 1, r8ui) uniform uimage2D dstTex;
+layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE, local_size_z = 1) in;
+layout (r8ui) readonly uniform uimage2D srcTex;
+layout (r8ui) writeonly uniform uimage2D dstTex;
 
 uniform uint bs, ss, c;
 uniform ivec2 size;

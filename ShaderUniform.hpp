@@ -47,9 +47,9 @@ struct Uniform {
     >
   >;
   GLuint uniformId = 0;
-  GLuint progId = 0;
+  GLuint programId = 0;
   std::string location;
-  Uniform(std::string loc):
+  explicit Uniform(std::string loc):
     location(loc)
   {}
   GLuint id() const {
@@ -59,17 +59,14 @@ struct Uniform {
     if(location == "") {
       TERMINATE("location is unset\n");
     }
-    GLuint lc = glGetUniformLocation(progId, location.c_str()); GLERROR
+    GLuint lc = glGetUniformLocation(programId, location.c_str()); GLERROR
     return lc;
   }
   void set_id(GLuint program_id) {
-    if(program_id == 0) {
-      TERMINATE("program id is already set\n");
+    if(programId != 0) {
+      TERMINATE("program id already set");
     }
-    if(progId == program_id) {
-      return;
-    }
-    progId = program_id;
+    programId = program_id;
     uniformId = loc();
   }
   bool is_active() {
@@ -77,17 +74,23 @@ struct Uniform {
     GLsizei length;
     GLint size;
     GLenum t;
-    glGetActiveUniform(progId, uniformId, 80, &length, &size, &t, name); GLERROR
+    glGetActiveUniform(programId, uniformId, 80, &length, &size, &t, name); GLERROR
     return t == gltype && location == name;
   }
+  std::string str() const {
+    char s[256];
+    snprintf(s, 256, "[U[p=%u][u=%u][loc=%s]]", unsigned(programId), unsigned(uniformId), location.c_str());
+    return s;
+  }
   void unset_id() {
-    progId = 0;
+    programId = 0;
   }
   void set_data(dtype data);
+  type get_data() const;
 };
 
 #define CHECK_PROGRAM_ID \
-  if(progId == 0) { \
+  if(programId == 0) { \
     TERMINATE("unable to set data to a uniform without program id set\n"); \
   }
 
@@ -168,6 +171,55 @@ template <>
 void Uniform<UniformType::SAMPLER2D>::set_data(Uniform<UniformType::SAMPLER2D>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniform1i(uniformId, data); GLERROR
+}
+
+
+template <>
+typename Uniform<gl::UniformType::INTEGER>::type Uniform<gl::UniformType::INTEGER>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::INTEGER>::type val;
+  glGetUniformiv(programId, uniformId, &val); GLERROR
+  return val;
+}
+
+template <>
+typename Uniform<gl::UniformType::UINTEGER>::type Uniform<gl::UniformType::UINTEGER>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::UINTEGER>::type val;
+  glGetUniformuiv(programId, uniformId, &val); GLERROR
+  return val;
+}
+
+template <>
+typename Uniform<gl::UniformType::FLOAT>::type Uniform<gl::UniformType::FLOAT>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::FLOAT>::type val;
+  glGetUniformfv(programId, uniformId, &val); GLERROR
+  return val;
+}
+
+template <>
+typename Uniform<gl::UniformType::VEC2>::type Uniform<gl::UniformType::VEC2>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::VEC2>::type val;
+  glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename Uniform<gl::UniformType::VEC3>::type Uniform<gl::UniformType::VEC3>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::VEC3>::type val;
+  glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename Uniform<gl::UniformType::VEC4>::type Uniform<gl::UniformType::VEC4>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::VEC4>::type val;
+  glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
 }
 
 #undef CHECK_PROGRAM_ID
