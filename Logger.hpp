@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstdarg>
-#include <string>
 #include <cstdlib>
 
+#include <string>
 #include <mutex>
 
 #include <File.hpp>
@@ -34,22 +34,18 @@ class Logger {
     }
   }
   void Write(const char *fmt, va_list args) {
-    /* #ifndef NDEBUG */
-      std::lock_guard<std::mutex> guard(mtx);
-      if(file == nullptr)return;
-      ASSERT(file != nullptr);
-      vfprintf(file, fmt, args);
-      fflush(file);
-    /* #endif */
+    std::lock_guard<std::mutex> guard(mtx);
+    if(file == nullptr)return;
+    ASSERT(file != nullptr);
+    vfprintf(file, fmt, args);
+    fflush(file);
   }
   void WriteFmt(const char *prefix, const char *fmt, va_list args) {
-    /* #ifndef NDEBUG */
-      std::lock_guard<std::mutex> guard(mtx);
-      if(file == nullptr)return;
-      ASSERT(file != nullptr);
-      vfprintf(file, (std::string() + prefix + fmt).c_str(), args);
-      fflush(file);
-    /* #endif */
+    std::lock_guard<std::mutex> guard(mtx);
+    if(file == nullptr)return;
+    ASSERT(file != nullptr);
+    vfprintf(file, (std::string() + prefix + fmt).c_str(), args);
+    fflush(file);
   }
   static Logger *instance;
 public:

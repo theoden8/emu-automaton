@@ -11,6 +11,8 @@ template <GLenum TextureType>
 struct Texture {
   GLuint tex;
 
+
+  GLuint id() const { return tex; }
   static void init(Texture<TextureType> &tx) {
     tx.init();
   }
@@ -20,7 +22,7 @@ struct Texture {
   }
 
   void init() {
-    Texture<TextureType>::init(tex);
+    gl::Texture<TextureType>::init(tex);
   }
 
   static void bind(Texture<TextureType> &tx) {
@@ -32,7 +34,7 @@ struct Texture {
   }
 
   void bind() {
-    Texture<TextureType>::bind(tex);
+    gl::Texture<TextureType>::bind(tex);
   }
 
   template <typename T>
@@ -60,7 +62,7 @@ struct Texture {
     glBindTexture(TextureType, 0); GLERROR
   }
 
-  static void clear(Texture<TextureType> &tx) {
+  static void clear(gl::Texture<TextureType> &tx) {
     tx.clear();
   }
 
@@ -72,5 +74,4 @@ struct Texture {
     Texture<TextureType>::clear(tex);
   }
 };
-
 } // namespace gl

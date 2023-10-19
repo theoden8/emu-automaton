@@ -6,15 +6,16 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "incgraphics.h"
-#include "Debug.hpp"
-#include "Logger.hpp"
+#include <incgraphics.h>
+#include <Debug.hpp>
+#include <Logger.hpp>
 
 namespace gl {
 enum class UniformType {
   INTEGER, UINTEGER, FLOAT,
   VEC2, VEC3, VEC4,
   IVEC2, IVEC3, IVEC4,
+  UVEC2, UVEC3, UVEC4,
   MAT2, MAT3, MAT4,
   SAMPLER2D
 };
@@ -30,11 +31,15 @@ template <> struct u_cast_type <UniformType::VEC4> { using type = glm::vec4; usi
 template <> struct u_cast_type <UniformType::IVEC2> { using type = glm::ivec2; using_sc gltype = GL_INT_VEC2; };
 template <> struct u_cast_type <UniformType::IVEC3> { using type = glm::ivec3; using_sc gltype = GL_INT_VEC3; };
 template <> struct u_cast_type <UniformType::IVEC4> { using type = glm::ivec4; using_sc gltype = GL_INT_VEC4; };
+template <> struct u_cast_type <UniformType::UVEC2> { using type = glm::uvec2; using_sc gltype = GL_UNSIGNED_INT_VEC2; };
+template <> struct u_cast_type <UniformType::UVEC3> { using type = glm::uvec3; using_sc gltype = GL_UNSIGNED_INT_VEC3; };
+template <> struct u_cast_type <UniformType::UVEC4> { using type = glm::uvec4; using_sc gltype = GL_UNSIGNED_INT_VEC4; };
 template <> struct u_cast_type <UniformType::MAT2> { using type = glm::mat2; using_sc gltype = GL_FLOAT_MAT2; };
 template <> struct u_cast_type <UniformType::MAT3> { using type = glm::mat3; using_sc gltype = GL_FLOAT_MAT3; };
 template <> struct u_cast_type <UniformType::MAT4> { using type = glm::mat4; using_sc gltype = GL_FLOAT_MAT4; };
 template <> struct u_cast_type <UniformType::SAMPLER2D> { using type = GLuint; using_sc gltype = GL_SAMPLER_2D; };
 #undef using_sc
+
 
 template <UniformType U>
 struct Uniform {
@@ -125,7 +130,7 @@ void gl::Uniform<gl::UniformType::VEC3>::set_data(Uniform<gl::UniformType::VEC3>
 }
 
 template <>
-void Uniform<UniformType::VEC4>::set_data(Uniform<UniformType::VEC4>::dtype data) {
+void gl::Uniform<UniformType::VEC4>::set_data(Uniform<UniformType::VEC4>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniform4f(uniformId, data.x, data.y, data.z, data.t); GLERROR
 }
@@ -143,39 +148,57 @@ void gl::Uniform<gl::UniformType::IVEC3>::set_data(Uniform<gl::UniformType::IVEC
 }
 
 template <>
-void Uniform<UniformType::IVEC4>::set_data(Uniform<UniformType::IVEC4>::dtype data) {
+void gl::Uniform<UniformType::IVEC4>::set_data(Uniform<UniformType::IVEC4>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniform4i(uniformId, data.x, data.y, data.z, data.t); GLERROR
 }
 
+template <>
+void gl::Uniform<gl::UniformType::UVEC2>::set_data(Uniform<gl::UniformType::UVEC2>::dtype data) {
+  CHECK_PROGRAM_ID;
+  glUniform2ui(uniformId, data.x, data.y); GLERROR
+}
 
 template <>
-void Uniform<UniformType::MAT2>::set_data(Uniform<UniformType::MAT2>::dtype data) {
+void gl::Uniform<gl::UniformType::UVEC3>::set_data(Uniform<gl::UniformType::UVEC3>::dtype data) {
+  CHECK_PROGRAM_ID;
+  glUniform3ui(uniformId, data.x, data.y, data.z); GLERROR
+}
+
+template <>
+void gl::Uniform<UniformType::UVEC4>::set_data(Uniform<UniformType::UVEC4>::dtype data) {
+  CHECK_PROGRAM_ID;
+  glUniform4ui(uniformId, data.x, data.y, data.z, data.t); GLERROR
+}
+
+
+template <>
+void gl::Uniform<UniformType::MAT2>::set_data(Uniform<UniformType::MAT2>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniformMatrix2fvARB(uniformId, 1 , GL_FALSE, glm::value_ptr(data)); GLERROR
 }
 
 template <>
-void Uniform<UniformType::MAT3>::set_data(Uniform<UniformType::MAT3>::dtype data) {
+void gl::Uniform<UniformType::MAT3>::set_data(Uniform<UniformType::MAT3>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniformMatrix3fvARB(uniformId, 1 , GL_FALSE, glm::value_ptr(data)); GLERROR
 }
 
 template <>
-void Uniform<UniformType::MAT4>::set_data(Uniform<UniformType::MAT4>::dtype data) {
+void gl::Uniform<UniformType::MAT4>::set_data(Uniform<UniformType::MAT4>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniformMatrix4fvARB(uniformId, 1 , GL_FALSE, glm::value_ptr(data)); GLERROR
 }
 
 template <>
-void Uniform<UniformType::SAMPLER2D>::set_data(Uniform<UniformType::SAMPLER2D>::dtype data) {
+void gl::Uniform<UniformType::SAMPLER2D>::set_data(Uniform<UniformType::SAMPLER2D>::dtype data) {
   CHECK_PROGRAM_ID;
   glUniform1i(uniformId, data); GLERROR
 }
 
 
 template <>
-typename Uniform<gl::UniformType::INTEGER>::type Uniform<gl::UniformType::INTEGER>::get_data() const {
+typename gl::Uniform<gl::UniformType::INTEGER>::type Uniform<gl::UniformType::INTEGER>::get_data() const {
   CHECK_PROGRAM_ID;
   typename gl::Uniform<gl::UniformType::INTEGER>::type val;
   glGetUniformiv(programId, uniformId, &val); GLERROR
@@ -183,7 +206,7 @@ typename Uniform<gl::UniformType::INTEGER>::type Uniform<gl::UniformType::INTEGE
 }
 
 template <>
-typename Uniform<gl::UniformType::UINTEGER>::type Uniform<gl::UniformType::UINTEGER>::get_data() const {
+typename gl::Uniform<gl::UniformType::UINTEGER>::type Uniform<gl::UniformType::UINTEGER>::get_data() const {
   CHECK_PROGRAM_ID;
   typename gl::Uniform<gl::UniformType::UINTEGER>::type val;
   glGetUniformuiv(programId, uniformId, &val); GLERROR
@@ -191,7 +214,7 @@ typename Uniform<gl::UniformType::UINTEGER>::type Uniform<gl::UniformType::UINTE
 }
 
 template <>
-typename Uniform<gl::UniformType::FLOAT>::type Uniform<gl::UniformType::FLOAT>::get_data() const {
+typename gl::Uniform<gl::UniformType::FLOAT>::type Uniform<gl::UniformType::FLOAT>::get_data() const {
   CHECK_PROGRAM_ID;
   typename gl::Uniform<gl::UniformType::FLOAT>::type val;
   glGetUniformfv(programId, uniformId, &val); GLERROR
@@ -199,7 +222,7 @@ typename Uniform<gl::UniformType::FLOAT>::type Uniform<gl::UniformType::FLOAT>::
 }
 
 template <>
-typename Uniform<gl::UniformType::VEC2>::type Uniform<gl::UniformType::VEC2>::get_data() const {
+typename gl::Uniform<gl::UniformType::VEC2>::type Uniform<gl::UniformType::VEC2>::get_data() const {
   CHECK_PROGRAM_ID;
   typename gl::Uniform<gl::UniformType::VEC2>::type val;
   glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
@@ -207,7 +230,7 @@ typename Uniform<gl::UniformType::VEC2>::type Uniform<gl::UniformType::VEC2>::ge
 }
 
 template <>
-typename Uniform<gl::UniformType::VEC3>::type Uniform<gl::UniformType::VEC3>::get_data() const {
+typename gl::Uniform<gl::UniformType::VEC3>::type Uniform<gl::UniformType::VEC3>::get_data() const {
   CHECK_PROGRAM_ID;
   typename gl::Uniform<gl::UniformType::VEC3>::type val;
   glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
@@ -215,10 +238,91 @@ typename Uniform<gl::UniformType::VEC3>::type Uniform<gl::UniformType::VEC3>::ge
 }
 
 template <>
-typename Uniform<gl::UniformType::VEC4>::type Uniform<gl::UniformType::VEC4>::get_data() const {
+typename gl::Uniform<gl::UniformType::VEC4>::type Uniform<gl::UniformType::VEC4>::get_data() const {
   CHECK_PROGRAM_ID;
   typename gl::Uniform<gl::UniformType::VEC4>::type val;
   glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::IVEC2>::type Uniform<gl::UniformType::IVEC2>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::IVEC2>::type val;
+  glGetUniformiv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::IVEC3>::type Uniform<gl::UniformType::IVEC3>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::IVEC3>::type val;
+  glGetUniformiv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::IVEC4>::type Uniform<gl::UniformType::IVEC4>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::IVEC4>::type val;
+  glGetUniformiv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::UVEC2>::type Uniform<gl::UniformType::UVEC2>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::UVEC2>::type val;
+  glGetUniformuiv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::UVEC3>::type Uniform<gl::UniformType::UVEC3>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::UVEC3>::type val;
+  glGetUniformuiv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::UVEC4>::type Uniform<gl::UniformType::UVEC4>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::UVEC4>::type val;
+  glGetUniformuiv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+
+template <>
+typename gl::Uniform<gl::UniformType::MAT2>::type Uniform<gl::UniformType::MAT2>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::MAT2>::type val;
+  glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::MAT3>::type Uniform<gl::UniformType::MAT3>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::MAT3>::type val;
+  glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::MAT4>::type Uniform<gl::UniformType::MAT4>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::MAT4>::type val;
+  glGetUniformfv(programId, uniformId, glm::value_ptr(val)); GLERROR
+  return val;
+}
+
+template <>
+typename gl::Uniform<gl::UniformType::SAMPLER2D>::type Uniform<gl::UniformType::SAMPLER2D>::get_data() const {
+  CHECK_PROGRAM_ID;
+  typename gl::Uniform<gl::UniformType::INTEGER>::type val;
+  glGetUniformiv(programId, uniformId, &val); GLERROR
   return val;
 }
 

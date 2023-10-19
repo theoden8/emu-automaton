@@ -1,11 +1,10 @@
 #pragma once
 
-#include "incgraphics.h"
+#include <incgraphics.h>
 
-#include "File.hpp"
-#include "Shader.hpp"
-#include "Debug.hpp"
-#include "Logger.hpp"
+#include <File.hpp>
+#include <Debug.hpp>
+#include <Logger.hpp>
 
 #include <string>
 #include <cstdlib>
@@ -66,13 +65,23 @@ struct Shader {
     glShaderSource(shaderId, 1, &source, nullptr); GLERROR
     glCompileShader(shaderId); GLERROR
   }
+
+  static void init(Shader<ShaderT> &shader) {
+    shader.init();
+  }
+
   void clear() {
     glDeleteShader(shaderId); GLERROR
+  }
+
+  static void clear(Shader<ShaderT> &shader) {
+    shader.clear();
   }
 };
 
 using VertexShader = Shader<ShaderType::VERTEX>;
+using GeometryShader = Shader<ShaderType::GEOMETRY>;
 using FragmentShader = Shader<ShaderType::FRAGMENT>;
 using ComputeShader = Shader<ShaderType::COMPUTE>;
 
-}
+} // namespace gl

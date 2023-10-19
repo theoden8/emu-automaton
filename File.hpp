@@ -81,10 +81,12 @@ std::string get_executable_directory(int argc, char *argv[]) {
   }
   const std::string exec = x;
 #endif
+#if 0
 #if defined _WIN32 || defined __CYGWIN__
 #define FILE_SEPARATOR '\\'
 #else
 #define FILE_SEPARATOR '/'
+#endif
 #endif
   std::string::size_type n = exec.rfind('/');
   std::string folder;

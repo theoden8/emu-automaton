@@ -4,7 +4,6 @@
 #include <Debug.hpp>
 
 #include <ShaderProgram.hpp>
-#include <ShaderAttrib.hpp>
 #include <ShaderUniform.hpp>
 #include <Texture.hpp>
 #include <Window.hpp>
@@ -20,10 +19,12 @@ struct TexturedGridRenderer {
   int no_states;
   int w, h;
 
-  gl::VertexArray
-    vao;
-  gl::Attrib<GL_ARRAY_BUFFER, gl::AttribType::VEC2>
+  gl::Buffer<GL_ARRAY_BUFFER, gl::BufferElementType::VEC2>
+    bufVertex;
+  gl::Attrib<decltype(bufVertex)>
     attrVertex; //("vertex"s);
+  gl::VertexArray<decltype(attrVertex)>
+    vao;
   gl::ShaderProgram<
     gl::VertexShader,
     gl::FragmentShader
@@ -35,7 +36,6 @@ struct TexturedGridRenderer {
   gl::Uniform<gl::UniformType::INTEGER>
     uColorscheme;
 
-  using ShaderAttrib = decltype(attrVertex);
   using ShaderProgram = decltype(prog);
 
   int colorscheme = 0;
@@ -45,7 +45,7 @@ struct TexturedGridRenderer {
   explicit TexturedGridRenderer(int no_states, const std::string &dir):
     no_states(no_states),
     w(0), h(0),
-    attrVertex("vertex"s),
+    bufVertex(), attrVertex("vertex"s, bufVertex), vao(attrVertex),
     prog({
       std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("aut4.vert"s)),
       std::string(sys::Path(dir) / sys::Path("shaders"s) / sys::Path("aut4.frag"s))
@@ -57,20 +57,18 @@ struct TexturedGridRenderer {
 
   void init_renderer(Window &w, int factor) {
     // init attribute vertex
-    ShaderAttrib::init(attrVertex);
+    bufVertex.init();
     std::vector<float> points = {
       1,1, -1,1, -1,-1,
       -1,-1, 1,1, 1,-1,
     };
-    attrVertex.allocate<GL_STATIC_DRAW>(points.size() / 2, points.data());
+    bufVertex.allocate<GL_STATIC_DRAW>(points);
     // add the attribute to the vertex array
-    gl::VertexArray::init(vao);
-    gl::VertexArray::bind(vao);
+    vao.init();
     vao.enable(attrVertex);
-    vao.set_access(attrVertex, 0, 0);
-    gl::VertexArray::unbind();
+    vao.set_access(attrVertex, 0);
     // init shader program
-    ShaderProgram::init(prog, vao, {"attrVertex"});
+    ShaderProgram::init(prog, vao);
     prog.assign_uniforms(uSampler, uNstates, uColorscheme);
     set_grid_size(w.width(), w.height(), factor);
     init_textures();
@@ -94,17 +92,16 @@ struct TexturedGridRenderer {
     gl::Texture<GL_TEXTURE_2D>::set_active(global_texture_index);
     gl::Texture<GL_TEXTURE_2D>::bind(get_current_texture_id());
     // draw triangles
-    gl::VertexArray::bind(vao);
-    glDrawArrays(GL_TRIANGLES, 0, 6); GLERROR
-    gl::VertexArray::unbind();
+    vao.draw<GL_TRIANGLES>();
     // unuse
     gl::Texture<GL_TEXTURE_2D>::unbind();
     ShaderProgram::unuse();
   }
 
   virtual void clear() {
-    ShaderAttrib::clear(attrVertex);
-    gl::VertexArray::clear(vao);
+    attrVertex.clear();
+    bufVertex.clear();
+    vao.clear();
     ShaderProgram::clear(prog);
     ShaderProgram::unassign_uniforms(uSampler, uNstates, uColorscheme);
   }
@@ -434,6 +431,9 @@ struct Renderer<ca::BSC, storage_mode::TEXTURES, AccessMode> : public TexturedGr
     //glFinish(); GLERROR
     ShaderProgramCompute::unuse();
     current_tex = current_tex ? 0 : 1;
+    gl::Texture<GL_TEXTURE_2D>::bind(get_current_texture_id());
+    glGenerateMipmap(GL_TEXTURE_2D); GLERROR
+    gl::Texture<GL_TEXTURE_2D>::unbind();
   }
 
   GLuint get_current_texture_id() override {

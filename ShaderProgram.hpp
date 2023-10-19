@@ -11,12 +11,16 @@
 #include <Tuple.hpp>
 #include <Shader.hpp>
 #include <ShaderAttrib.hpp>
+#include <VertexArray.hpp>
 
 namespace gl {
 template <typename... ShaderTs>
 class ShaderProgram {
+  using self_t = ShaderProgram<ShaderTs...>;
+
   GLuint programId = 0;
   std::tuple<ShaderTs...> shaders;
+  bool shaderOwnership;
 
   enum class ResourceType {
     UNIFORM,
@@ -70,8 +74,7 @@ public:
     GLenum format;
     void *data = nullptr;
 
-    Binary(ShaderProgram<ShaderTs...> &program)
-    {
+    Binary(ShaderProgram<ShaderTs...> &program) {
       size = program.get<GL_PROGRAM_BINARY_LENGTH>();
       data = malloc(size);
       GLint written_bytes;
@@ -89,30 +92,38 @@ public:
   }
 
   void compile_program() {
-    Tuple::for_each(shaders, [&](auto &s) mutable {
-      s.init();
+    Tuple::for_each(shaders, [&](auto &s) mutable -> void {
+      Logger::Debug("init shader '%s'\n", s.file.name().c_str());
+      if(shaderOwnership) {
+        s.init();
+      }
     });
+
     programId = glCreateProgram(); GLERROR
-    ASSERT(programId != 0);
-    Tuple::for_each(shaders, [&](auto &s) mutable {
+    ASSERT(this->programId != 0);
+    Tuple::for_each(shaders, [&](auto &s) mutable -> void {
+      Logger::Debug("attach shader '%s'\n", s.file.name().c_str());
       glAttachShader(programId, s.id()); GLERROR
     });
+    Logger::Debug("link program\n");
     glLinkProgram(programId); GLERROR
-    Tuple::for_each(shaders, [&](auto &s) mutable {
-      s.clear();
+    Tuple::for_each(shaders, [&](auto &s) mutable -> void {
+      Logger::Debug("clear shader '%s'\n", s.file.name().c_str());
+      if(shaderOwnership) {
+        s.clear();
+      }
     });
-    ASSERT(is_valid());
+    ASSERT(this->is_valid());
   }
 
-  void bind_attrib(const std::vector <std::string> &locations) {
-    for(size_t i = 0; i < locations.size(); ++i) {
-      glBindAttribLocation(programId, i, locations[i].c_str()); GLERROR
-    }
+  void bind_attrib(int index, const std::string &location) {
+    glBindAttribLocation(programId, index, location.c_str()); GLERROR
   }
 
   template <typename... STRINGs>
   ShaderProgram(STRINGs&&... shader_filenames):
-    shaders(std::forward<STRINGs>(shader_filenames)...)
+    shaders(std::forward<STRINGs>(shader_filenames)...),
+    shaderOwnership(true)
   {}
 
   GLuint id() const {
@@ -146,36 +157,40 @@ public:
     return name;
   }
 
-  static void init(ShaderProgram<ShaderTs...> &program, gl::VertexArray &vao, const std::vector<std::string> &&locations) {
-    program.init(vao, locations);
+  template <typename... AttribTs>
+  static void init(self_t &program, gl::VertexArray<AttribTs ...> &vao) {
+    program.init(vao);
   }
 
-  void init(gl::VertexArray &vao, const std::vector <std::string> &&locations) {
-    init(vao, locations);
+  template <typename... AttribTs>
+  void init(gl::VertexArray<AttribTs...> &vao) {
+    gl::VertexArray<AttribTs...>::bind(vao);
+    this->compile_program();
+    int i = 0;
+    Tuple::for_each(vao.attributes, [&](const auto &attrib) -> void {
+      this->bind_attrib(i, attrib.location);
+      ++i;
+    });
+    gl::VertexArray<AttribTs...>::unbind();
   }
 
-  void init(gl::VertexArray &vao, const std::vector <std::string> &locations) {
-    vao.bind();
-    compile_program();
-    bind_attrib(locations);
-    gl::VertexArray::unbind();
-  }
 
   static void use(GLuint progId) {
     glUseProgram(progId); GLERROR
   }
 
-  static void use(ShaderProgram<ShaderTs...> &program) {
+  static void use(self_t &program) {
     program.use();
   }
 
   void use() {
-    use(id());
+    this->use(id());
   }
 
   template <typename ShaderUniformT>
   int assign_uniform(ShaderUniformT &uniform) const {
     uniform.set_id(this->id());
+    Logger::Debug("%d <- %s\n", int(this->id()), uniform.str().c_str());
     return 0;
   }
 
@@ -232,7 +247,7 @@ public:
     glUseProgram(0); GLERROR
   }
 
-  static void clear(ShaderProgram<ShaderTs...> &program) {
+  static void clear(self_t &program) {
     program.clear();
   }
 
@@ -303,11 +318,11 @@ public:
         for(int j = 0; j < size; j++) {
           char long_name[256];
           sprintf(long_name, "%s[%d]", name, j);
-          int location = glGetAttribLocation(programId, long_name);
+          int location = glGetAttribLocation(programId, long_name); GLERROR
           Logger::Info("  %d) type:%s name:%s location:%d\n", i, GL_type_to_string(type), long_name, location);
         }
       } else {
-        int location = glGetAttribLocation(programId, name);
+        int location = glGetAttribLocation(programId, name); GLERROR
         Logger::Info("  %d) type:%s name:%s location:%d\n", i, GL_type_to_string(type), name, location);
       }
     }
@@ -325,11 +340,11 @@ public:
         for(int j = 0; j < size; j++) {
           char long_name[512];
           sprintf(long_name, "%s[%d]", name, j);
-          int location = glGetUniformLocation(programId, long_name);
+          int location = glGetUniformLocation(programId, long_name); GLERROR
           Logger::Info("  %d) type:%s name:%s location:%d\n", i, GL_type_to_string(type), long_name, location);
         }
       } else {
-        int location = glGetUniformLocation(programId, name);
+        int location = glGetUniformLocation(programId, name); GLERROR
         Logger::Info("  %d) type:%s name:%s location:%d\n", i, GL_type_to_string(type), name, location);
       }
     }
