@@ -317,7 +317,7 @@ public:
       if(size > 1) {
         for(int j = 0; j < size; j++) {
           char long_name[256];
-          sprintf(long_name, "%s[%d]", name, j);
+          snprintf(long_name, sizeof(long_name), "%s[%d]", name, j);
           int location = glGetAttribLocation(programId, long_name); GLERROR
           Logger::Info("  %d) type:%s name:%s location:%d\n", i, GL_type_to_string(type), long_name, location);
         }
