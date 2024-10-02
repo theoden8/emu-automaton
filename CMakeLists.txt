@@ -55,6 +55,7 @@ file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY resources/DroidSans.ttf DESTINATION ${CMAKE_BINARY_DIR}/resources)
 
 find_package(Threads REQUIRED)
+add_compile_definitions(FLAG_THREADS)
 if(THREADS_HAVE_PTHREAD_ARG)
   target_compile_options(${exec} PUBLIC "-pthread")
 endif()

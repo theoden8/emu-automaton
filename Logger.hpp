@@ -4,7 +4,10 @@
 #include <cstdlib>
 
 #include <string>
+
+#ifdef FLAG_THREADS
 #include <mutex>
+#endif
 
 #include <File.hpp>
 #include <Debug.hpp>
@@ -15,7 +18,9 @@ class Logger {
 
   static char *log_file;
   static FILE *log_file_ptr;
+#ifdef FLAG_THREADS
   std::mutex mtx;
+#endif
 
   explicit Logger(const char *filename):
     filename(filename)
@@ -34,14 +39,18 @@ class Logger {
     }
   }
   void Write(const char *fmt, va_list args) {
+#ifdef FLAT_THREADS
     std::lock_guard<std::mutex> guard(mtx);
+#endif
     if(file == nullptr)return;
     ASSERT(file != nullptr);
     vfprintf(file, fmt, args);
     fflush(file);
   }
   void WriteFmt(const char *prefix, const char *fmt, va_list args) {
+#ifdef FLAT_THREADS
     std::lock_guard<std::mutex> guard(mtx);
+#endif
     if(file == nullptr)return;
     ASSERT(file != nullptr);
     vfprintf(file, (std::string() + prefix + fmt).c_str(), args);
